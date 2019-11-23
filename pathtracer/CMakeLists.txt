@@ -2,6 +2,8 @@ cmake_minimum_required ( VERSION 3.0.2 )
 
 project ( pathtracer )
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 find_package ( embree 2.12 REQUIRED )
 include_directories ( ${EMBREE_INCLUDE_DIRS} )
 

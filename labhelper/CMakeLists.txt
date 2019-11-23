@@ -2,6 +2,10 @@ cmake_minimum_required ( VERSION 3.0.2 )
 
 project ( labhelper )
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+cmake_policy(SET CMP0072 NEW)
+
 # External libraries which need to be built.
 add_subdirectory ( ${CMAKE_SOURCE_DIR}/external_src/imgui-1.51 ${CMAKE_CURRENT_BINARY_DIR}/imgui )
 set_target_properties(imgui PROPERTIES FOLDER external)

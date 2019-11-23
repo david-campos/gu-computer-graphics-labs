@@ -55,17 +55,64 @@ uniform vec3 viewSpaceLightPosition;
 ///////////////////////////////////////////////////////////////////////////////
 layout(location = 0) out vec4 fragmentColor;
 
+vec2 sphericalCoords(vec3 dir) {
+	float theta = acos(max(-1.0f, min(1.0f, dir.y)));
+	float phi = atan(dir.z, dir.x);
+	if(phi < 0.0f)
+	{
+		phi = phi + 2.0f * PI;
+	}
+	return vec2(phi / (2.0 * PI), theta / PI);
+}
 
 vec3 calculateDirectIllumiunation(vec3 wo, vec3 n, vec3 base_color)
 {
-	return vec3(1.f);
+
+	vec3 wi = normalize(viewSpaceLightPosition - viewSpacePosition);
+	float d = length(viewSpaceLightPosition - viewSpacePosition);
+	vec3 Li = point_light_intensity_multiplier * point_light_color / (d * d);
+
+	if (dot(n, wi) <= 0) {
+		return vec3(0);
+	}
+
+	vec3 diffuse_term = material_color * 1.0 / PI * abs(dot(n, wi)) * Li;
+
+	vec3 wh = normalize(wi + wo);
+	float F = material_fresnel + (1 - material_fresnel) * pow(1 - dot(wh, wi), 5);
+	float D = (material_shininess + 2) / (2 * PI) * pow(abs(dot(n, wh)), material_shininess);
+	float G = min(1, min(
+	2*dot(n, wh)*dot(n, wo) / dot(wo, wh),
+	2*dot(n, wh)*dot(n, wi) / dot(wo, wh)
+	));
+	float brdf = F * D * G / (4 * dot(n, wo) * dot(n, wi));
+
+	vec3 dielectric_term = brdf * dot(n, wi) * Li + (1 - F) * diffuse_term;
+	vec3 metal_term = brdf * material_color * dot(n, wi)*Li;
+	vec3 microfacet_term = material_metalness * metal_term + (1-material_metalness) * dielectric_term;
+
+	return material_reflectivity * microfacet_term + (1- material_reflectivity) * diffuse_term;
 }
 
 vec3 calculateIndirectIllumination(vec3 wo, vec3 n, vec3 base_color)
 {
-	return vec3(0.0);
-}
+	vec3 N = (viewInverse * vec4(n, 1.0f)).xyz;
+	vec2 lookup = sphericalCoords(N);
+	vec4 irradiance = environment_multiplier * texture(irradianceMap, lookup);
+	vec3 diffuse_term = material_color * (1 / PI) * irradiance.rgb;
 
+	vec3 wi = normalize(reflect(-wo, n));
+	float roughness = sqrt(sqrt(2.f/(material_shininess+2.f)));
+	lookup = sphericalCoords(wi);
+	vec3 Li = environment_multiplier * textureLod(reflectionMap, lookup, roughness * 7.0).xyz;
+
+	vec3 wh = normalize(wi + wo);
+	float F = material_fresnel + (1 - material_fresnel) * pow(1 - dot(wh, wi), 5);
+	vec3 dielectric_term = F * Li + (1 - F) * diffuse_term;
+	vec3 metal_term = F * material_color * Li;
+	vec3 microfacet_term = material_metalness * metal_term + (1 - material_metalness) * dielectric_term;
+	return material_reflectivity * microfacet_term + (1-material_reflectivity) * diffuse_term;
+}
 
 void main()
 {

@@ -5,6 +5,7 @@ precision highp float;
 
 layout(binding = 0) uniform sampler2D frameBufferTexture;
 layout(binding = 1) uniform sampler2D blurredFrameBufferTexture;
+layout(binding = 2) uniform sampler2D bloomTexture;
 uniform float time = 0.f;
 uniform int currentEffect = 0;
 uniform int filterSize = 1;
@@ -18,7 +19,7 @@ layout(location = 0) out vec4 fragmentColor;
 */
 vec4 textureRect(in sampler2D tex, vec2 rectangleCoord)
 {
-	return texture(tex, rectangleCoord / textureSize(tex, 0));
+    return texture(tex, rectangleCoord / textureSize(tex, 0));
 }
 
 /**
@@ -47,86 +48,91 @@ vec3 grayscale(vec3 rgbSample);
  */
 vec3 toSepiaTone(vec3 rgbSample);
 
-
+vec2 mosaic(vec2 inCoord);
 
 void main()
 {
-	switch(currentEffect)
-	{
-	case 0:
-		fragmentColor = textureRect(frameBufferTexture, gl_FragCoord.xy);
-		break;
-	case 1:
-		fragmentColor = vec4(toSepiaTone(textureRect(frameBufferTexture, gl_FragCoord.xy).xyz), 1.0);
-		break;
-	case 2:
-		fragmentColor = textureRect(frameBufferTexture, mushrooms(gl_FragCoord.xy));
-		break;
-	case 3:
-		fragmentColor = vec4(blur(gl_FragCoord.xy), 1.0);
-		break;
-	case 4:
-		fragmentColor = vec4(grayscale(textureRect(frameBufferTexture, gl_FragCoord.xy).xyz), 1.0);
-		break;
-	case 5:
-		// all at once
-		fragmentColor = vec4(toSepiaTone(blur(mushrooms(gl_FragCoord.xy))), 1.0);
-		break;
-	case 6:
-		fragmentColor = vec4(0.0); // place holder
-		break;
-	case 7:
-		fragmentColor = vec4(0.0); // place holder
-		break;
-	case 8:
-		fragmentColor = vec4(0.0); // place holder
-		break;
-	}
+    switch (currentEffect)
+    {
+        case 0:
+        fragmentColor = textureRect(frameBufferTexture, gl_FragCoord.xy);
+        break;
+        case 1:
+        fragmentColor = vec4(toSepiaTone(textureRect(frameBufferTexture, gl_FragCoord.xy).xyz), 1.0);
+        break;
+        case 2:
+        fragmentColor = textureRect(frameBufferTexture, mushrooms(gl_FragCoord.xy));
+        break;
+        case 3:
+        fragmentColor = vec4(blur(gl_FragCoord.xy), 1.0);
+        break;
+        case 4:
+        fragmentColor = vec4(grayscale(textureRect(frameBufferTexture, gl_FragCoord.xy).xyz), 1.0);
+        break;
+        case 5:
+        // all at once
+        fragmentColor = vec4(toSepiaTone(blur(mushrooms(gl_FragCoord.xy))), 1.0);
+        break;
+        case 6:
+        fragmentColor = textureRect(frameBufferTexture, mosaic(gl_FragCoord.xy));
+        break;
+        case 7:
+        fragmentColor = textureRect(blurredFrameBufferTexture, gl_FragCoord.xy);
+        break;
+        case 8:
+        fragmentColor = (
+                textureRect(bloomTexture, gl_FragCoord.xy) + textureRect(frameBufferTexture, gl_FragCoord.xy)
+            ) *0.5;
+        break;
+    }
 }
 
+vec2 mosaic(vec2 inCoord) {
+    return floor(inCoord * 0.05) * 20;
+}
 
 vec3 toSepiaTone(vec3 rgbSample)
 {
-	//-----------------------------------------------------------------
-	// Variables used for YIQ/RGB color space conversion.
-	//-----------------------------------------------------------------
-	vec3 yiqTransform0 = vec3(0.299, 0.587, 0.144);
-	vec3 yiqTransform1 = vec3(0.596, -0.275, -0.321);
-	vec3 yiqTransform2 = vec3(0.212, -0.523, 0.311);
+    //-----------------------------------------------------------------
+    // Variables used for YIQ/RGB color space conversion.
+    //-----------------------------------------------------------------
+    vec3 yiqTransform0 = vec3(0.299, 0.587, 0.144);
+    vec3 yiqTransform1 = vec3(0.596, -0.275, -0.321);
+    vec3 yiqTransform2 = vec3(0.212, -0.523, 0.311);
 
-	vec3 yiqInverseTransform0 = vec3(1, 0.956, 0.621);
-	vec3 yiqInverseTransform1 = vec3(1, -0.272, -0.647);
-	vec3 yiqInverseTransform2 = vec3(1, -1.105, 1.702);
+    vec3 yiqInverseTransform0 = vec3(1, 0.956, 0.621);
+    vec3 yiqInverseTransform1 = vec3(1, -0.272, -0.647);
+    vec3 yiqInverseTransform2 = vec3(1, -1.105, 1.702);
 
-	// transform to YIQ color space and set color information to sepia tone
-	vec3 yiq = vec3(dot(yiqTransform0, rgbSample), 0.2, 0.0);
+    // transform to YIQ color space and set color information to sepia tone
+    vec3 yiq = vec3(dot(yiqTransform0, rgbSample), 0.2, 0.0);
 
-	// inverse transform to RGB color space
-	vec3 result = vec3(dot(yiqInverseTransform0, yiq), dot(yiqInverseTransform1, yiq),
-	                   dot(yiqInverseTransform2, yiq));
-	return result;
+    // inverse transform to RGB color space
+    vec3 result = vec3(dot(yiqInverseTransform0, yiq), dot(yiqInverseTransform1, yiq),
+    dot(yiqInverseTransform2, yiq));
+    return result;
 }
 
 vec2 mushrooms(vec2 inCoord)
 {
-	return inCoord + vec2(sin(time * 4.3127 + inCoord.y / 9.0) * 15.0, 0.0);
+    return inCoord + vec2(sin(time * 4.3127 + inCoord.y / 9.0) * 15.0, 0.0);
 }
 
 vec3 blur(vec2 coord)
 {
-	vec3 result = vec3(0.0);
-	float weight = 1.0 / (filterSize * filterSize);
+    vec3 result = vec3(0.0);
+    float weight = 1.0 / (filterSize * filterSize);
 
-	for(int i = -filterSize / 2; i <= filterSize / 2; ++i)
-		for(int j = -filterSize / 2; j <= filterSize / 2; ++j)
-		{
-			result += weight * textureRect(frameBufferTexture, coord + vec2(i, j)).xyz;
-		}
+    for (int i = -filterSize / 2; i <= filterSize / 2; ++i)
+    for (int j = -filterSize / 2; j <= filterSize / 2; ++j)
+    {
+        result += weight * textureRect(frameBufferTexture, coord + vec2(i, j)).xyz;
+    }
 
-	return result;
+    return result;
 }
 
 vec3 grayscale(vec3 rgbSample)
 {
-	return vec3(rgbSample.r * 0.2126 + rgbSample.g * 0.7152 + rgbSample.b * 0.0722);
+    return vec3(rgbSample.r * 0.2126 + rgbSample.g * 0.7152 + rgbSample.b * 0.0722);
 }

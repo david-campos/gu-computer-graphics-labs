@@ -558,14 +558,24 @@ bool linkShaderProgram(GLuint shaderProgram, bool allow_errors)
 	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &linkOk);
 	if(!linkOk)
 	{
-		std::string err = GetShaderInfoLog(shaderProgram);
-		if(allow_errors)
-		{
-			non_fatal_error(err, "Linking");
+        GLint maxLength = 0;
+        glGetProgramiv(shaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
+
+        // The maxLength includes the NULL character
+        std::vector<GLchar> infoLog(maxLength);
+        glGetProgramInfoLog(shaderProgram, maxLength, &maxLength, &infoLog[0]);
+
+        // The shaderProgram is useless now. So delete it.
+        glDeleteProgram(shaderProgram);
+
+        std::string str(infoLog.begin(), infoLog.end());
+        if(allow_errors)
+        {
+            non_fatal_error(str, "Linking");
 		}
 		else
 		{
-			fatal_error(err, "Linking");
+			fatal_error(str, "Linking");
 		}
 		return false;
 	}
