@@ -491,9 +491,17 @@ GLuint loadShaderProgram(const std::string& vertexShader, const std::string& fra
 	GLuint fShader = glCreateShader(GL_FRAGMENT_SHADER);
 
 	std::ifstream vs_file(vertexShader);
+	if (!vs_file.good()) {
+	    fatal_error("File not found: " + vertexShader, "Vertex shader");
+	    return 0;
+	}
 	std::string vs_src((std::istreambuf_iterator<char>(vs_file)), std::istreambuf_iterator<char>());
 
 	std::ifstream fs_file(fragmentShader);
+    if (!fs_file.good()) {
+        fatal_error("File not found: " + fragmentShader, "Fragment shader");
+        return 0;
+    }
 	std::string fs_src((std::istreambuf_iterator<char>(fs_file)), std::istreambuf_iterator<char>());
 
 	const char* vs = vs_src.c_str();

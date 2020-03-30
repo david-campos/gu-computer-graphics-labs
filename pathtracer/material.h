@@ -50,6 +50,9 @@ public:
 	virtual vec3 refraction_brdf(const vec3& wi, const vec3& wo, const vec3& n);
 	virtual vec3 reflection_brdf(const vec3& wi, const vec3& wo, const vec3& n);
 	virtual vec3 f(const vec3& wi, const vec3& wo, const vec3& n) override;
+	inline float F(const vec3& wi,  const vec3& wh);
+	inline float D(const vec3&wh, const vec3& n);
+	inline float G(const vec3&wi, const vec3&wo, const vec3&wh, const vec3& n);
 	virtual vec3 sample_wi(vec3& wi, const vec3& wo, const vec3& n, float& p) override;
 };
 

@@ -53,7 +53,7 @@ else()
 	# Find library files
 	find_library(
 		EMBREE_LIBRARY
-		NAMES embree embree.2
+		NAMES embree.2 embree
 		PATHS
 			/usr/lib64
 			/usr/lib
