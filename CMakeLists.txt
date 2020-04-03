@@ -33,7 +33,7 @@ endmacro(config_build_output)
 add_definitions(-DGLM_ENABLE_EXPERIMENTAL)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 set ( CMAKE_EXPORT_COMPILE_COMMANDS ON )
-set ( CMAKE_BUILD_TYPE DEBUG )
+#set ( CMAKE_BUILD_TYPE DEBUG )
 set ( CMAKE_CXX_STANDARD 11 )
 
 add_subdirectory ( labhelper )

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <glm/ext.hpp>
 #include "material.h"
 #include "embree.h"
 #include "sampling.h"
@@ -59,7 +60,6 @@ namespace pathtracer {
         vec3 L = vec3(0.0f);
         vec3 path_throughput = vec3(1.0);
         Ray current_ray = primary_ray;
-
         for (int bounces = 0; bounces <= settings.max_bounces; bounces++) {
             ///////////////////////////////////////////////////////////////////
             // Get the intersection information from the ray
@@ -70,13 +70,20 @@ namespace pathtracer {
             // sample directions.
             ///////////////////////////////////////////////////////////////////
 
+            float roughness = 0.01/*hit.material->m_shininess > 0 ? 500.f/hit.material->m_shininess : 1.f*/;
             Diffuse diffuse(hit.material->m_color);
-            BlinnPhong dielectric(hit.material->m_shininess, hit.material->m_fresnel, &diffuse);
-//            BlinnPhongMetal metal(hit.material->m_color, hit.material->m_shininess,
-//                    hit.material->m_fresnel);
-//            LinearBlend metal_blend(hit.material->m_metalness, &metal, &dielectric);
-//            LinearBlend reflectivity_blend(hit.material->m_reflectivity, &metal_blend, &diffuse);
-            BRDF &mat = dielectric;
+//            BSDF &mat = diffuse;
+//            BlinnPhong dielectric(roughness, hit.material->m_fresnel, &diffuse);
+            BTDF transparency(1.5f, roughness, hit.material->m_fresnel, hit.material->m_color);
+//            BSDF &mat = transparency;
+            BlinnPhongMetal metal(hit.material->m_color, roughness,
+                    hit.material->m_fresnel);
+            LinearBlend metal_blend(hit.material->m_metalness, &metal, &transparency);
+            LinearBlend reflectivity_blend(hit.material->m_reflectivity, &metal_blend, &diffuse);
+            BSDF &mat = reflectivity_blend;
+//            LinearBlend transparency_blend(hit.material->m_transparency, &transparency, &reflectivity_blend);
+//            BSDF &mat = transparency_blend;
+
             ///////////////////////////////////////////////////////////////////
             // Calculate Direct Illumination from light.
             ///////////////////////////////////////////////////////////////////
@@ -102,14 +109,16 @@ namespace pathtracer {
 
             // return L before division by pdf so we can safely return pdf as 0 from the sample function
             // when there is some error which cuts light
-            if (all(lessThan(abs(brdf), vec3(FLT_EPSILON)))) return L;
+            if (pdf == 0.f || all(lessThan(abs(brdf), vec3(FLT_EPSILON))))
+                return L;
 
-            float cosine_term = std::max(0.0f, dot(wi, hit.shading_normal));
+            float cosine_term = abs(dot(wi, hit.shading_normal));
             path_throughput *= (brdf * cosine_term) / pdf;
 
-            if (all(lessThan(abs(path_throughput), vec3(FLT_EPSILON)))) return L;
+            if (all(lessThan(abs(path_throughput), vec3(FLT_EPSILON))))
+                return L;
 
-            current_ray = Ray(hit.position + hit.geometry_normal * EPSILON, wi);
+            current_ray = Ray(hit.position + wi * EPSILON, wi);
 
             if (!intersect(current_ray))
                 return L + path_throughput * Lenvironment(wi);
@@ -161,6 +170,9 @@ namespace pathtracer {
                     // Otherwise evaluate environment
                     color = Lenvironment(primaryRay.d);
                 }
+//                if (any(isnan(color))) {
+//                    color = vec3(1.f, 0.f, 1.f);
+//                }
                 // Accumulate the obtained radiance to the pixels color
                 float n = float(rendered_image.number_of_samples);
                 rendered_image.data[y * rendered_image.width + x] =
