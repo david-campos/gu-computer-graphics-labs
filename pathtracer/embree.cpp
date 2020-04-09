@@ -105,6 +105,10 @@ Intersection getIntersection(const Ray& r)
 	i.geometry_normal = -normalize(r.n);
 	i.position = r.o + r.tfar * r.d;
 	i.wo = normalize(-r.d);
+	vec2 t0 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 0];
+    vec2 t1 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 1];
+    vec2 t2 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 2];
+    i.texture_coords = w * t0 + r.u * t1 + r.v * t2;
 	return i;
 }
 

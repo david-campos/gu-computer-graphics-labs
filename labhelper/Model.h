@@ -13,7 +13,14 @@ struct Texture
 	std::string directory;
 	int width, height;
 	uint8_t* data = nullptr;
+	int components;
 	bool load(const std::string& directory, const std::string& filename, int nof_components);
+	/** From top-left-most */
+	uint8_t color(int pixel_x, int pixel_y, int component) const;
+	float colorf(float u, float v) const;
+	glm::vec2 colorf2(float u, float v) const;
+	glm::vec3 colorf3(float u, float v) const;
+	glm::vec4 colorf4(float u, float v) const;
 };
 //////////////////////////////////////////////////////////////////////////////
 // This material class implements a subset of the suggested PBR extension
@@ -28,14 +35,14 @@ struct Material
 	std::string m_name;
 	glm::vec3 m_color;
 	float m_reflectivity;
-	float m_shininess;
+	float m_roughness;
 	float m_metalness;
 	float m_fresnel;
 	float m_emission;
 	float m_transparency;
 	Texture m_color_texture;
 	Texture m_reflectivity_texture;
-	Texture m_shininess_texture;
+	Texture m_roughness_texture;
 	Texture m_metalness_texture;
 	Texture m_fresnel_texture;
 	Texture m_emission_texture;

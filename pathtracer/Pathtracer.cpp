@@ -69,20 +69,38 @@ namespace pathtracer {
             // Create a Material tree for evaluating brdfs and calculating
             // sample directions.
             ///////////////////////////////////////////////////////////////////
+            vec4 color = vec4(hit.material->m_color, 1.f - hit.material->m_transparency);
+            if (hit.material->m_color_texture.valid) {
+                color = hit.material->m_color_texture.colorf4(hit.texture_coords.x, hit.texture_coords.y);
+            }
+            float metalness = hit.material->m_metalness;
+            if (hit.material->m_metalness_texture.valid) {
+                metalness = hit.material->m_metalness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+            }
+            float fresnel = hit.material->m_fresnel;
+            if (hit.material->m_fresnel_texture.valid) {
+                fresnel = hit.material->m_fresnel_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+            }
+            float roughness = fclamp(hit.material->m_roughness, 0.001f, 1.f);
+            if (hit.material->m_roughness_texture.valid) {
+                roughness = hit.material->m_roughness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+            }
+            float reflectivity = hit.material->m_reflectivity;
+            if (hit.material->m_reflectivity_texture.valid) {
+                roughness = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+            }
 
-            float roughness = 0.01/*hit.material->m_shininess > 0 ? 500.f/hit.material->m_shininess : 1.f*/;
-            Diffuse diffuse(hit.material->m_color);
+            Diffuse diffuse(color);
 //            BSDF &mat = diffuse;
-//            BlinnPhong dielectric(roughness, hit.material->m_fresnel, &diffuse);
-            BTDF transparency(1.5f, roughness, hit.material->m_fresnel, hit.material->m_color);
+            BlinnPhong dielectric(roughness, fresnel, &diffuse);
+            BTDF transparency(1.5f, roughness, fresnel, color);
 //            BSDF &mat = transparency;
-            BlinnPhongMetal metal(hit.material->m_color, roughness,
-                    hit.material->m_fresnel);
-            LinearBlend metal_blend(hit.material->m_metalness, &metal, &transparency);
-            LinearBlend reflectivity_blend(hit.material->m_reflectivity, &metal_blend, &diffuse);
-            BSDF &mat = reflectivity_blend;
-//            LinearBlend transparency_blend(hit.material->m_transparency, &transparency, &reflectivity_blend);
-//            BSDF &mat = transparency_blend;
+            BlinnPhongMetal metal(color, roughness, fresnel);
+            LinearBlend metal_blend(metalness, &metal, &dielectric);
+            LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
+//            BSDF &mat = reflectivity_blend;
+            LinearBlend transparency_blend(color.a, &reflectivity_blend, &transparency);
+            BSDF &mat = transparency_blend;
 
             ///////////////////////////////////////////////////////////////////
             // Calculate Direct Illumination from light.
@@ -100,6 +118,10 @@ namespace pathtracer {
             }
 
             // Emission
+            float emission = hit.material->m_emission;
+            if (hit.material->m_emission_texture.valid) {
+                emission = hit.material->m_emission_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+            }
             L += path_throughput * hit.material->m_emission * hit.material->m_color;
 
             // Sample incoming direction

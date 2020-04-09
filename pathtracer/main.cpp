@@ -88,11 +88,14 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-	models.push_back(
-	    make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
 	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(10.f, 0.f, 0.f))));
-//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere.obj"), mat4(1.0f)));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(1.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(1.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
+
 
 	///////////////////////////////////////////////////////////////////////////
 	// Add models to pathtracer scene
@@ -376,7 +379,7 @@ void gui()
 			ImGui::SliderFloat("Reflectivity", &material.m_reflectivity, 0.0f, 1.0f);
 			ImGui::SliderFloat("Metalness", &material.m_metalness, 0.0f, 1.0f);
 			ImGui::SliderFloat("Fresnel", &material.m_fresnel, 0.0f, 1.0f);
-			ImGui::SliderFloat("shininess", &material.m_shininess, 0.0f, 25000.0f);
+			ImGui::SliderFloat("roughness", &material.m_roughness, 0.001f, 1.0f);
 			ImGui::SliderFloat("Emission", &material.m_emission, 0.0f, 10.0f);
 			ImGui::SliderFloat("Transparency", &material.m_transparency, 0.0f, 1.0f);
 

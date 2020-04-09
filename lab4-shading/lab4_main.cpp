@@ -465,7 +465,7 @@ void gui() {
         ImGui::SliderFloat("Reflectivity", &material.m_reflectivity, 0.0f, 1.0f);
         ImGui::SliderFloat("Metalness", &material.m_metalness, 0.0f, 1.0f);
         ImGui::SliderFloat("Fresnel", &material.m_fresnel, 0.0f, 1.0f);
-        ImGui::SliderFloat("Shininess", &material.m_shininess, 0.0f, 25000.0f, "%.3f", 5);
+        ImGui::SliderFloat("Shininess", &material.m_roughness, 0.0f, 25000.0f, "%.3f", 5);
         ImGui::SliderFloat("Emission", &material.m_emission, 0.0f, 10.0f);
     }
 

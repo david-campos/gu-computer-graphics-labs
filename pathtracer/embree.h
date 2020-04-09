@@ -60,6 +60,7 @@ struct Intersection
 	glm::vec3 geometry_normal;
 	glm::vec3 shading_normal;
 	glm::vec3 wo;
+	glm::vec2 texture_coords;
 	const labhelper::Material* material;
 };
 Intersection getIntersection(const Ray& r);
