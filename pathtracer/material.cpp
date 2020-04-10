@@ -138,8 +138,8 @@ namespace pathtracer {
 ///////////////////////////////////////////////////////////////////////////
 // A perfect specular refraction.
 ///////////////////////////////////////////////////////////////////////////
-    // Schlick approximation for the Fresnel
     float BTDF::F(const vec3 &wi, const vec3 &wh, float eta_i, float eta_o) {
+        // Eq. 22 in the paper
         float c = abs(dot(wi, wh));
         float sqr = eta_o * eta_o / (eta_i * eta_i) - 1 + c * c;
         if (sqr < 0) return 1.f;
@@ -150,8 +150,10 @@ namespace pathtracer {
         float den = c * g_m_c + 1;
         return g_m_c * g_m_c / (2 * g_p_c * g_p_c) * (1 + num * num / (den * den));
 
+        // Schlick approximation for the Fresnel
 //        return R0 + (1.f - R0) * pow(max(0.f, 1.f - abs(dot(wh, wi))), 5.f);
 
+        // Book version (c is the same as in paper version)
 //        float sinThetaI = sqrtf(max(0.f, 1.f - c * c));
 //        float sinThetaT = eta_i / eta_o * sinThetaI;
 //        if (sinThetaT >= 1.f) return 1.f;
@@ -176,11 +178,12 @@ namespace pathtracer {
         return 0.f;
     }
 
-    // Eq. 34
+    // Eq. 23
     float BTDF::G(const vec3 &wi, const vec3 &wo, const vec3 &wh, const vec3 &n) {
         return G1(wo, wh, n) * G1(wi, wh, n);
     }
 
+    // Eq. 34
     float BTDF::G1(const vec3 &v, const vec3 &m, const vec3 &n) {
         float v_m = dot(v, m);
         float v_n = dot(v, n);
@@ -191,36 +194,34 @@ namespace pathtracer {
     }
 
     vec3 BTDF::reflection_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
-        vec3 wh = normalize(wo + wi);
+        vec3 hr = normalize(sign(dot(wi, n)) * (wo + wi));
         if (dot(wi, n) <= 0.f || !sameHemisphere(wi, wo, n)) return vec3(0.0f);
-        float eta_i = dot(wo, n) > 0 ? refraction_index : 1;
-        float eta_o = dot(wo, n) > 0 ? 1 : refraction_index;
-        return vec3(F(wi, wh, eta_i, eta_o) * D(wh, n) * G(wi, wo, wh, n) / (4 * abs(dot(n, wo) * dot(n, wi))));
+        float eta_i = dot(wo, n) > 0 ? 1 : refraction_index;
+        float eta_o = dot(wo, n) > 0 ? refraction_index : 1;
+        return vec3(F(wi, hr, eta_i, eta_o) * D(hr, n) * G(wi, wo, hr, n) / (4 * abs(dot(n, wo) * dot(n, wi))));
     }
 
-    vec3 BTDF::refraction_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
-        // wo·n > 0 => original ray goes out, eta_i = material, eta_o = 1
-        // wo·n < 0 => ray goes in, eta_i = 1, eta_o = material
-        float eta_i = dot(wo, n) > 0 ? refraction_index : 1;
-        float eta_o = dot(wo, n) > 0 ? 1 : refraction_index;
+    vec3 BTDF::refraction_brdf(const vec3 &i, const vec3 &o, const vec3 &n) {
+        float eta_i = dot(o, n) > 0 ? refraction_index : 1;
+        float eta_o = dot(o, n) > 0 ? 1 : refraction_index;
 
-        vec3 ht = normalize(-(eta_i * wi + eta_o * wo));
+        vec3 ht = normalize(-(eta_i * i + eta_o * o));
 
-        float wo_n = dot(wo, n);
-        float wi_ht = dot(wi, ht);
-        float wi_n = dot(wi, n);
-        float wo_ht = dot(wo, ht);
+        float o_n = dot(o, n);
+        float i_ht = dot(i, ht);
+        float i_n = dot(i, n);
+        float o_ht = dot(o, ht);
 
-        if (wi_n == 0.f || wo_n == 0.f) return vec3(0.f); // division by 0
-        if (wi_ht == 0.f && wo_ht == 0.f) return vec3(0.f); // division by 0
+        if (i_n == 0.f || o_n == 0.f) return vec3(0.f); // division by 0
+        if (i_ht == 0.f && o_ht == 0.f) return vec3(0.f); // division by 0
 
-        float g = G(wi, wo, ht, n);
-        float f = F(wi, ht, eta_i, eta_o);
+        float g = G(i, o, ht, n);
+        float f = F(i, ht, eta_i, eta_o);
         float d = D(ht, n);
 
-        float frac0 = abs(wi_ht * wo_ht / (wi_n * wo_n));
+        float frac0 = abs(i_ht * o_ht / (i_n * o_n));
         float frac1Num = eta_o * eta_o * (1 - f) * g * d;
-        float frac1Den = eta_i * wi_ht + eta_o * wo_ht;
+        float frac1Den = eta_i * i_ht + eta_o * o_ht;
 
         return vec3(frac0 * frac1Num / (frac1Den * frac1Den));
     }
@@ -241,10 +242,8 @@ namespace pathtracer {
         // Probability for the microfacet
         float p_m = D(m, n) * abs(dot(m, n));
 
-        // wo·n > 0 => original ray goes out, eta_i = material, eta_o = 1
-        // wo·n < 0 => ray goes in, eta_i = 1, eta_o = material
-        float eta_i = dot(wo, n) > 0 ? 1 : refraction_index; //: 1;
-        float eta_o = dot(wo, n) > 0 ? refraction_index : 1; //: refraction_index;
+        float eta_i = dot(wo, n) > 0 ? 1 : refraction_index;
+        float eta_o = dot(wo, n) > 0 ? refraction_index : 1;
 
         float fresnel = F(wo, m, eta_i, eta_o);
         if (randf() < fresnel) {
@@ -252,7 +251,6 @@ namespace pathtracer {
             p = p_m / (4 * abs(dot(wo, m)));
             wi = reflect(-wo, m);
             p *= fresnel;
-            return reflection_brdf(wi, wo, n);
         } else {
             // Refraction
 
@@ -278,16 +276,13 @@ namespace pathtracer {
             p = p_m * eta_o * eta_o * abs(dot(wo, ht)) / (sq_den * sq_den);
 
             p *= 1.f - fresnel;
-            return refraction_brdf(wo, wi, n);
         }
+        return f(wi, wo, n);
     }
 
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         vec3 refl = reflection_brdf(wi, wo, n);
         vec3 refr = refraction_brdf(wi, wo, n);
-        if (any(isnan(refl + refr))) {
-            printf("%s %s\n", glm::to_string(refl).data(), glm::to_string(refr).data());
-        };
         return refl + refr;
     }
 } // namespace pathtracer

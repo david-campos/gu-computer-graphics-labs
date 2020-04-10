@@ -90,17 +90,17 @@ namespace pathtracer {
                 roughness = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
 
-            Diffuse diffuse(color);
+//            Diffuse diffuse(color);
 //            BSDF &mat = diffuse;
-            BlinnPhong dielectric(roughness, fresnel, &diffuse);
+//            BlinnPhong dielectric(roughness, fresnel, &diffuse);
             BTDF transparency(1.5f, roughness, fresnel, color);
-//            BSDF &mat = transparency;
-            BlinnPhongMetal metal(color, roughness, fresnel);
-            LinearBlend metal_blend(metalness, &metal, &dielectric);
-            LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
+            BSDF &mat = transparency;
+//            BlinnPhongMetal metal(color, roughness, fresnel);
+//            LinearBlend metal_blend(metalness, &metal, &dielectric);
+//            LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
 //            BSDF &mat = reflectivity_blend;
-            LinearBlend transparency_blend(color.a * 0.f, &reflectivity_blend, &transparency);
-            BSDF &mat = transparency_blend;
+//            LinearBlend transparency_blend(color.a * 0.f, &reflectivity_blend, &transparency);
+//            BSDF &mat = transparency_blend;
 
             ///////////////////////////////////////////////////////////////////
             // Calculate Direct Illumination from light.
@@ -113,8 +113,13 @@ namespace pathtracer {
                 const float falloff_factor = 1.0f / (distance_to_light * distance_to_light);
                 vec3 Li = point_light.intensity_multiplier * point_light.color * falloff_factor;
                 vec3 wi = normalize(point_light.position - hit.position);
-                L += path_throughput * mat.f(wi, hit.wo, hit.shading_normal) * Li *
+                vec3 brdf =  mat.f(wi, hit.wo, hit.shading_normal);
+                L += path_throughput * brdf * Li *
                      std::max(0.0f, dot(wi, hit.shading_normal));
+                if (any(isnan(L))) {
+                    printf("NAN after light!\n");
+                    printf("\tbrdf=%s\n", glm::to_string(brdf).data());
+                }
             }
 
             // Emission
@@ -122,17 +127,12 @@ namespace pathtracer {
             if (hit.material->m_emission_texture.valid) {
                 emission = hit.material->m_emission_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
-            L += path_throughput * hit.material->m_emission * hit.material->m_color;
+            L += path_throughput * emission * hit.material->m_color;
 
             // Sample incoming direction
             vec3 wi;
             float pdf;
             vec3 brdf = mat.sample_wi(wi, hit.wo, hit.shading_normal, pdf);
-
-            if (any(isnan(brdf))) printf("BRDF has nans!\n");
-            if (any(isnan(wi))) printf("wi has nans!\n");
-            if (any(isnan(path_throughput))) printf("path_throug has nans!\n");
-            if (isnan(pdf)) printf("PDF is nan\n");
 
             // return L before division by pdf so we can safely return pdf as 0 from the sample function
             // when there is some error which cuts light
@@ -142,18 +142,15 @@ namespace pathtracer {
             float cosine_term = abs(dot(wi, hit.shading_normal));
             path_throughput *= (brdf * cosine_term) / pdf;
 
-            if (any(isnan(brdf))) printf("BRDF has nans!\n");
-            if (any(isnan(wi))) printf("wi has nans!\n");
-            if (any(isnan(path_throughput))) printf("path_throug has nans!\n");
-            if (isnan(pdf)) printf("PDF is nan\n");
-
             if (all(lessThan(abs(path_throughput), vec3(FLT_EPSILON))))
                 return L;
 
-            current_ray = Ray(hit.position + wi * EPSILON, wi);
+            current_ray = Ray(hit.position + sign(dot(hit.geometry_normal, wi)) * hit.geometry_normal * EPSILON, wi);
 
-            if (!intersect(current_ray))
-                return L + path_throughput * Lenvironment(wi);
+            if (!intersect(current_ray)) {
+                L += path_throughput * Lenvironment(wi);
+                return L;
+            }
         }
         return L;
     }
@@ -202,9 +199,10 @@ namespace pathtracer {
                     // Otherwise evaluate environment
                     color = Lenvironment(primaryRay.d);
                 }
-//                if (any(isnan(color))) {
+                if (any(isnan(color))) {
+                    printf("NAN!\n");
 //                    color = vec3(1.f, 0.f, 1.f);
-//                }
+                }
                 // Accumulate the obtained radiance to the pixels color
                 float n = float(rendered_image.number_of_samples);
                 rendered_image.data[y * rendered_image.width + x] =

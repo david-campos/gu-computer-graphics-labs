@@ -97,7 +97,7 @@ namespace pathtracer {
         inline float G1(const vec3 &v, const vec3 &m, const vec3 &n);
         vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) override;
 
-        vec3 refraction_brdf(const vec3 &wi, const vec3 &wh, const vec3 &n);
+        vec3 refraction_brdf(const vec3 &i, const vec3 &o, const vec3 &n);
         virtual vec3 reflection_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n);
     };
 
