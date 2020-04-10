@@ -99,7 +99,7 @@ namespace pathtracer {
             LinearBlend metal_blend(metalness, &metal, &dielectric);
             LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
 //            BSDF &mat = reflectivity_blend;
-            LinearBlend transparency_blend(color.a, &reflectivity_blend, &transparency);
+            LinearBlend transparency_blend(color.a * 0.f, &reflectivity_blend, &transparency);
             BSDF &mat = transparency_blend;
 
             ///////////////////////////////////////////////////////////////////
@@ -129,6 +129,11 @@ namespace pathtracer {
             float pdf;
             vec3 brdf = mat.sample_wi(wi, hit.wo, hit.shading_normal, pdf);
 
+            if (any(isnan(brdf))) printf("BRDF has nans!\n");
+            if (any(isnan(wi))) printf("wi has nans!\n");
+            if (any(isnan(path_throughput))) printf("path_throug has nans!\n");
+            if (isnan(pdf)) printf("PDF is nan\n");
+
             // return L before division by pdf so we can safely return pdf as 0 from the sample function
             // when there is some error which cuts light
             if (pdf == 0.f || all(lessThan(abs(brdf), vec3(FLT_EPSILON))))
@@ -136,6 +141,11 @@ namespace pathtracer {
 
             float cosine_term = abs(dot(wi, hit.shading_normal));
             path_throughput *= (brdf * cosine_term) / pdf;
+
+            if (any(isnan(brdf))) printf("BRDF has nans!\n");
+            if (any(isnan(wi))) printf("wi has nans!\n");
+            if (any(isnan(path_throughput))) printf("path_throug has nans!\n");
+            if (isnan(pdf)) printf("PDF is nan\n");
 
             if (all(lessThan(abs(path_throughput), vec3(FLT_EPSILON))))
                 return L;

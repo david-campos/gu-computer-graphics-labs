@@ -91,7 +91,7 @@ namespace pathtracer {
     public:
         BTDF(float ri, float _roughness, float _R0, vec3 _color) : refraction_index(ri), roughness(_roughness), R0(_R0), color(_color) {}
         vec3 f(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
-        inline float F(const vec3 &wi, const vec3 &wh);
+        inline float F(const vec3 &wi, const vec3 &wh, float eta_i, float eta_o);
         inline float D(const vec3 &wh, const vec3 &n);
         inline float G(const vec3 &wi, const vec3 &wo, const vec3 &wh, const vec3 &n);
         inline float G1(const vec3 &v, const vec3 &m, const vec3 &n);

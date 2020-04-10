@@ -139,19 +139,28 @@ namespace pathtracer {
 // A perfect specular refraction.
 ///////////////////////////////////////////////////////////////////////////
     // Schlick approximation for the Fresnel
-    float BTDF::F(const vec3 &wi, const vec3 &wh) {
-//        float c = abs(dot(wi, wh));
-//        float eta_i = c < 0 ? refraction_index : 1;
-//        float eta_o = c < 0 ? 1 : refraction_index;
-//        float sqr = eta_o * eta_o / (eta_i * eta_i) - 1 + c * c;
-//        if (sqr < 0) return 1.f;
-//        float g = sqrt(sqr);
-//        float g_m_c = g - c;
-//        float g_p_c = g + c;
-//        float num = c * g_p_c - 1;
-//        float den = c * g_m_c + 1;
-//        return g_m_c * g_m_c / (2 * g_p_c * g_p_c) * (1 + num * num / (den * den));
-        return R0 + (1.f - R0) * pow(max(0.f, 1.f - abs(dot(wh, wi))), 5.f);
+    float BTDF::F(const vec3 &wi, const vec3 &wh, float eta_i, float eta_o) {
+        float c = abs(dot(wi, wh));
+        float sqr = eta_o * eta_o / (eta_i * eta_i) - 1 + c * c;
+        if (sqr < 0) return 1.f;
+        float g = sqrt(sqr);
+        float g_m_c = g - c;
+        float g_p_c = g + c;
+        float num = c * g_p_c - 1;
+        float den = c * g_m_c + 1;
+        return g_m_c * g_m_c / (2 * g_p_c * g_p_c) * (1 + num * num / (den * den));
+
+//        return R0 + (1.f - R0) * pow(max(0.f, 1.f - abs(dot(wh, wi))), 5.f);
+
+//        float sinThetaI = sqrtf(max(0.f, 1.f - c * c));
+//        float sinThetaT = eta_i / eta_o * sinThetaI;
+//        if (sinThetaT >= 1.f) return 1.f;
+//        float cosThetaT = sqrt(max(0.f, 1 - sinThetaT * sinThetaT));
+//        float Rparl = ((eta_o * c) - (eta_i * cosThetaT)) /
+//                      ((eta_o * c) + (eta_i * cosThetaT));
+//        float Rperp = ((eta_i * c) - (eta_o * cosThetaT)) /
+//                      ((eta_i * c) + (eta_o * cosThetaT));
+//        return (Rparl * Rparl + Rperp * Rperp) / 2;
     }
 
     // Eq. 33
@@ -184,7 +193,9 @@ namespace pathtracer {
     vec3 BTDF::reflection_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         vec3 wh = normalize(wo + wi);
         if (dot(wi, n) <= 0.f || !sameHemisphere(wi, wo, n)) return vec3(0.0f);
-        return vec3(F(wi, wh) * D(wh, n) * G(wi, wo, wh, n) / (4 * abs(dot(n, wo) * dot(n, wi))));
+        float eta_i = dot(wo, n) > 0 ? refraction_index : 1;
+        float eta_o = dot(wo, n) > 0 ? 1 : refraction_index;
+        return vec3(F(wi, wh, eta_i, eta_o) * D(wh, n) * G(wi, wo, wh, n) / (4 * abs(dot(n, wo) * dot(n, wi))));
     }
 
     vec3 BTDF::refraction_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
@@ -204,7 +215,7 @@ namespace pathtracer {
         if (wi_ht == 0.f && wo_ht == 0.f) return vec3(0.f); // division by 0
 
         float g = G(wi, wo, ht, n);
-        float f = F(wi, ht);
+        float f = F(wi, ht, eta_i, eta_o);
         float d = D(ht, n);
 
         float frac0 = abs(wi_ht * wo_ht / (wi_n * wo_n));
@@ -230,42 +241,37 @@ namespace pathtracer {
         // Probability for the microfacet
         float p_m = D(m, n) * abs(dot(m, n));
 
-        float fresnel = F(wo, m);
+        // wo·n > 0 => original ray goes out, eta_i = material, eta_o = 1
+        // wo·n < 0 => ray goes in, eta_i = 1, eta_o = material
+        float eta_i = dot(wo, n) > 0 ? 1 : refraction_index; //: 1;
+        float eta_o = dot(wo, n) > 0 ? refraction_index : 1; //: refraction_index;
+
+        float fresnel = F(wo, m, eta_i, eta_o);
         if (randf() < fresnel) {
             // Reflection
             p = p_m / (4 * abs(dot(wo, m)));
             wi = reflect(-wo, m);
             p *= fresnel;
-            return reflection_brdf(wi, wo, n) * color;
+            return reflection_brdf(wi, wo, n);
         } else {
             // Refraction
-            // wo·n > 0 => original ray goes out, eta_i = material, eta_o = 1
-            // wo·n < 0 => ray goes in, eta_i = 1, eta_o = material
-            float eta_i = dot(wo, n) > 0 ? 1 : refraction_index; //: 1;
-            float eta_o = dot(wo, n) > 0 ? refraction_index : 1; //: refraction_index;
 
-//            float inv_eta = eta_o / eta_i;
             float eta = eta_i / eta_o;
 
             float c = dot(wo, m);
 
-//            float sq = 1 - inv_eta * inv_eta * (1 - c * c);
-//            if (sq < 0.f) return vec3(0.f);
-//            wi = normalize(-inv_eta * (wo + (sign(c) * eta_i / eta_o * sqrt(sq) - c) * n));
-
             // Eq. 40
             float sq = 1 + eta * eta * (c * c - 1);
-            if (sq < 0) return vec3(0.f);
+            if (sq < 0) {
+                printf("Fresnel didn't catch total internal reflection!!\n");
+                return vec3(0.f);
+            }
             wi = (eta * c - sign(dot(wo, n)) * sqrt(sq)) * m - eta * wo;
 
-//           printf("plot vector{(%f,%f,%f),(%f,%f,%f),(%f,%f,%f)}\n", wi.x, wi.y, wi.z, n.x, n.y, n.z, wo.x, wo.y, wo.z);
             // Eq. 16
-
             // Should be colinear with m, but for some reason it is not :/
             vec3 ht = -(eta_o * wo + eta_i * wi);
-            float ht_len = length(ht);
             ht = normalize(ht);
-//            printf("ht · m = %f\n\t%f %f\n", dot(ht, m), ht_len, eta_i * dot(wi, ht) + eta_o * dot(wo, ht));
 
             // Eq. 38 ^ Eq. 17 (p_m * jacobian)
             float sq_den = eta_i * dot(wi, ht) + eta_o * dot(wo, ht);
@@ -279,7 +285,7 @@ namespace pathtracer {
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         vec3 refl = reflection_brdf(wi, wo, n);
         vec3 refr = refraction_brdf(wi, wo, n);
-        if (any(isnan(refl+refr))) {
+        if (any(isnan(refl + refr))) {
             printf("%s %s\n", glm::to_string(refl).data(), glm::to_string(refr).data());
         };
         return refl + refr;
