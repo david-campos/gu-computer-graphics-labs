@@ -251,6 +251,7 @@ namespace pathtracer {
             p = p_m / (4 * abs(dot(wo, m)));
             wi = reflect(-wo, m);
             p *= fresnel;
+            return reflection_brdf(wi, wo, n);
         } else {
             // Refraction
 
@@ -276,8 +277,9 @@ namespace pathtracer {
             p = p_m * eta_o * eta_o * abs(dot(wo, ht)) / (sq_den * sq_den);
 
             p *= 1.f - fresnel;
+            return refraction_brdf(wi, wo, n);
         }
-        return f(wi, wo, n);
+//        return f(wi, wo, n);
     }
 
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {

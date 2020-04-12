@@ -90,17 +90,17 @@ namespace pathtracer {
                 roughness = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
 
-//            Diffuse diffuse(color);
+            Diffuse diffuse(color);
 //            BSDF &mat = diffuse;
-//            BlinnPhong dielectric(roughness, fresnel, &diffuse);
-            BTDF transparency(1.5f, roughness, fresnel, color);
-            BSDF &mat = transparency;
-//            BlinnPhongMetal metal(color, roughness, fresnel);
-//            LinearBlend metal_blend(metalness, &metal, &dielectric);
-//            LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
+            BlinnPhong dielectric(roughness, fresnel, &diffuse);
+            BTDF transparency(1.3f, roughness, fresnel, color);
+//            BSDF &mat = transparency;
+            BlinnPhongMetal metal(color, roughness, fresnel);
+            LinearBlend metal_blend(metalness, &metal, &dielectric);
+            LinearBlend reflectivity_blend(reflectivity, &metal_blend, &diffuse);
 //            BSDF &mat = reflectivity_blend;
-//            LinearBlend transparency_blend(color.a * 0.f, &reflectivity_blend, &transparency);
-//            BSDF &mat = transparency_blend;
+            LinearBlend transparency_blend(color.a, &reflectivity_blend, &transparency);
+            BSDF &mat = transparency_blend;
 
             ///////////////////////////////////////////////////////////////////
             // Calculate Direct Illumination from light.
