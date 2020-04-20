@@ -113,7 +113,7 @@ namespace pathtracer {
                 const float falloff_factor = 1.0f / (distance_to_light * distance_to_light);
                 vec3 Li = point_light.intensity_multiplier * point_light.color * falloff_factor;
                 vec3 wi = normalize(point_light.position - hit.position);
-                vec3 brdf =  mat.f(wi, hit.wo, hit.shading_normal);
+                vec3 brdf = mat.f(wi, hit.wo, hit.shading_normal);
                 L += path_throughput * brdf * Li *
                      std::max(0.0f, dot(wi, hit.shading_normal));
                 if (any(isnan(L))) {
@@ -162,6 +162,9 @@ namespace pathtracer {
         return glm::vec3(p * (1.f / p.w));
     }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "openmp-use-default-none"
+
 ///////////////////////////////////////////////////////////////////////////
 // Trace one path per pixel and accumulate the result in an image
 ///////////////////////////////////////////////////////////////////////////
@@ -191,16 +194,37 @@ namespace pathtracer {
                 vec4 viewCoord = vec4(screenCoord.x * 2.0f - 1.0f, screenCoord.y * 2.0f - 1.0f, 1.0f, 1.0f);
                 vec3 p = homogenize(inverse(P * V) * viewCoord);
                 primaryRay.d = normalize(p - camera_pos);
+
+                // Check in focus
+                bool in_focus = false;
+                bool intersected = intersect(primaryRay);
+                if (intersected) {
+                    Intersection hit = getIntersection(primaryRay);
+                    if (length2((hit.position - primaryRay.o)) < settings.focal_distance * settings.focal_distance)
+                        in_focus = true;
+                }
+                // Perform focus blur
+                if (!in_focus) {
+                    auto focalPoint = primaryRay.o + primaryRay.d * settings.focal_distance;
+                    viewCoord += vec4(randf() - 0.5f, randf() - 0.5f, 0.f, 0.f) * settings.aperture;
+                    if (length2(p - camera_pos) > length2(focalPoint - camera_pos)) {
+                        printf("ERROR: Screen further than focal point!\n");
+                    }
+                    p = homogenize(inverse(P * V) * viewCoord);
+                    vec3 new_d = normalize(focalPoint - p);
+                    primaryRay = Ray(p, new_d);
+                    intersected = intersect(primaryRay);
+                }
                 // Intersect ray with scene
-                if (intersect(primaryRay)) {
-                    // If it hit something, evaluate the radiance from that point
+                if (intersected) {
+                    Intersection hit = getIntersection(primaryRay);
                     color = Li(primaryRay);
                 } else {
                     // Otherwise evaluate environment
                     color = Lenvironment(primaryRay.d);
                 }
                 if (any(isnan(color))) {
-                    printf("NAN!\n");
+                    printf("Error: NAN!\n");
 //                    color = vec3(1.f, 0.f, 1.f);
                 }
                 // Accumulate the obtained radiance to the pixels color
@@ -212,4 +236,6 @@ namespace pathtracer {
         }
         rendered_image.number_of_samples += 1;
     }
+
+#pragma clang diagnostic pop
 }; // namespace pathtracer

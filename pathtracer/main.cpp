@@ -66,6 +66,8 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	pathtracer::settings.max_bounces = 8;
 	pathtracer::settings.max_paths_per_pixel = 0; // 0 = Infinite
+	pathtracer::settings.aperture = 0.f;
+	pathtracer::settings.focal_distance = 100000.f;
 #ifdef _DEBUG
 	pathtracer::settings.subsampling = 16;
 #else
@@ -88,7 +90,7 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), scale(vec3(10.f)) * translate(vec3(0.0f, 10.0f, 0.0f))));
 	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(10.f, 0.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
@@ -310,6 +312,8 @@ void gui()
 		ImGui::SliderInt("Subsampling", &pathtracer::settings.subsampling, 1, 16);
 		ImGui::SliderInt("Max Bounces", &pathtracer::settings.max_bounces, 0, 16);
 		ImGui::SliderInt("Max Paths Per Pixel", &pathtracer::settings.max_paths_per_pixel, 0, 1024);
+		ImGui::SliderFloat("Focal distance", &pathtracer::settings.focal_distance, 131.f, 200.f);
+		ImGui::SliderFloat("Aperture", &pathtracer::settings.aperture, 0.f, 1.f);
 		ImGui::Text("Samples: %d", pathtracer::rendered_image.number_of_samples);
 		if(ImGui::Button("Restart Pathtracing"))
 		{
