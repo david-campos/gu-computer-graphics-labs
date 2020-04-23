@@ -68,6 +68,7 @@ void initialize()
 	pathtracer::settings.max_paths_per_pixel = 0; // 0 = Infinite
 	pathtracer::settings.aperture = 0.f;
 	pathtracer::settings.focal_distance = 100000.f;
+    pathtracer::settings.environment_light = true;
 #ifdef _DEBUG
 	pathtracer::settings.subsampling = 16;
 #else
@@ -77,9 +78,15 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Set up light
 	///////////////////////////////////////////////////////////////////////////
-	pathtracer::point_light.intensity_multiplier = 2500.0f;
-	pathtracer::point_light.color = vec3(1.f, 1.f, 1.f);
-	pathtracer::point_light.position = vec3(10.0f, 40.0f, 10.0f);
+//	pathtracer::point_light.intensity_multiplier = 2500.0f;
+//	pathtracer::point_light.color = vec3(1.f, 1.f, 1.f);
+//	pathtracer::point_light.position = vec3(10.0f, 40.0f, 10.0f);
+    pathtracer::lights.push_back(new pathtracer::CircleLight(worldUp * 17.f, -worldUp, 20.f, vec3(1.f, 0.f, 0.f)));
+    // To know where the light is
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/sphere.obj"),
+//            scale(translate(worldUp * 17.f),vec3(20.f, 1.f, 20.f))));
+    pathtracer::lights.push_back(new pathtracer::RectangleLight(worldUp * 30.f + vec3(-10.f, 0.f, -10.f),
+            vec3(20.f, 0.f, 0.f), vec3(0.f, 0.f, 20.f), vec3(0.f, 0.f, 1.f)));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -90,10 +97,11 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), scale(vec3(10.f)) * translate(vec3(0.0f, 10.0f, 0.0f))));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
 	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
-//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(10.f, 0.f, 0.f))));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(0.f, 10.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
@@ -312,13 +320,18 @@ void gui()
 		ImGui::SliderInt("Subsampling", &pathtracer::settings.subsampling, 1, 16);
 		ImGui::SliderInt("Max Bounces", &pathtracer::settings.max_bounces, 0, 16);
 		ImGui::SliderInt("Max Paths Per Pixel", &pathtracer::settings.max_paths_per_pixel, 0, 1024);
-		ImGui::SliderFloat("Focal distance", &pathtracer::settings.focal_distance, 131.f, 200.f);
-		ImGui::SliderFloat("Aperture", &pathtracer::settings.aperture, 0.f, 1.f);
+		ImGui::Checkbox("Environment Light", &pathtracer::settings.environment_light);
+        ImGui::Separator();
 		ImGui::Text("Samples: %d", pathtracer::rendered_image.number_of_samples);
 		if(ImGui::Button("Restart Pathtracing"))
 		{
 			pathtracer::restart();
 		}
+	}
+
+	if (ImGui::CollapsingHeader("Depth of Field", "dof", true, false)) {
+        ImGui::SliderFloat("Focal distance", &pathtracer::settings.focal_distance, 131.f, 200.f);
+        ImGui::SliderFloat("Aperture", &pathtracer::settings.aperture, 0.f, 1.f);
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -342,7 +355,7 @@ void gui()
 		// List all meshes in the model and show properties for the selected
 		///////////////////////////////////////////////////////////////////////////
 
-		if(ImGui::CollapsingHeader("Meshes", "meshes_ch", true, true))
+		if(ImGui::CollapsingHeader("Meshes", "meshes_ch", true, false))
 		{
 			if(ImGui::ListBox("Meshes", &mesh_index, mesh_getter, (void*)&model->m_meshes,
 			                  int(model->m_meshes.size()), 8))
@@ -368,7 +381,7 @@ void gui()
 		///////////////////////////////////////////////////////////////////////////
 		// List all materials in the model and show properties for the selected
 		///////////////////////////////////////////////////////////////////////////
-		if(ImGui::CollapsingHeader("Materials", "materials_ch", true, true))
+		if(ImGui::CollapsingHeader("Materials", "materials_ch", true, false))
 		{
 			ImGui::ListBox("Materials", &material_index, material_getter, (void*)&model->m_materials,
 			               uint32_t(model->m_materials.size()), 8);
@@ -402,10 +415,19 @@ void gui()
 	///////////////////////////////////////////////////////////////////////////
 	if(ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
 	{
-		ImGui::SliderFloat("Environment multiplier", &pathtracer::environment.multiplier, 0.0f, 10.0f);
-		ImGui::ColorEdit3("Point light color", &pathtracer::point_light.color.x);
-		ImGui::SliderFloat("Point light intensity multiplier", &pathtracer::point_light.intensity_multiplier,
-		                   0.0f, 10000.0f);
+	    int i = 1;
+	    for (auto* light: pathtracer::lights) {
+		    ImGui::ColorEdit3(("Color" + to_string(i)).c_str(), &light->color.x);
+		    auto* circle = dynamic_cast<pathtracer::CircleLight*>(light);
+		    if (circle) {
+		        ImGui::SliderFloat(("Radius " + to_string(i)).c_str(), &circle->_r, 1.f, 50.f);
+		    }
+	        i++;
+	    }
+//		ImGui::SliderFloat("Environment multiplier", &pathtracer::environment.multiplier, 0.0f, 10.0f);
+//		ImGui::ColorEdit3("Point light color", &pathtracer::point_light.color.x);
+//		ImGui::SliderFloat("Point light intensity multiplier", &pathtracer::point_light.intensity_multiplier,
+//		                   0.0f, 10000.0f);
 	}
 
 	ImGui::End(); // Control Panel
@@ -448,6 +470,10 @@ int main(int argc, char* argv[])
 	{
 		labhelper::freeModel(m.first);
 	}
+	for (auto* l: pathtracer::lights) {
+	    delete l;
+	}
+	pathtracer::lights.clear();
 	// Shut down everything. This includes the window and all other subsystems.
 	labhelper::shutDown(g_window);
 	return 0;

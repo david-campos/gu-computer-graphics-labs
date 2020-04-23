@@ -4,6 +4,7 @@
 #include <Model.h>
 #include <omp.h>
 #include "HDRImage.h"
+#include "light.h"
 
 #ifdef M_PI
 #undef M_PI
@@ -26,6 +27,7 @@ extern struct Settings
 	int max_paths_per_pixel;
 	float focal_distance;
 	float aperture;
+	bool environment_light;
 } settings;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,15 +52,8 @@ extern struct Image
 	}
 } rendered_image;
 
-///////////////////////////////////////////////////////////////////////////////
-// The light source
-///////////////////////////////////////////////////////////////////////////////
-extern struct PointLight
-{
-	float intensity_multiplier;
-	vec3 color;
-	vec3 position;
-} point_light;
+// We will assume only non-delta lights by now
+extern std::vector<Light*> lights;
 
 ///////////////////////////////////////////////////////////////////////////
 // Restart rendering of image

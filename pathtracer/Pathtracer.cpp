@@ -7,6 +7,7 @@
 #include "material.h"
 #include "embree.h"
 #include "sampling.h"
+#include "light.h"
 
 using namespace std;
 using namespace glm;
@@ -18,7 +19,7 @@ namespace pathtracer {
     Settings settings;
     Environment environment;
     Image rendered_image;
-    PointLight point_light;
+    std::vector<Light*> lights;
 
 ///////////////////////////////////////////////////////////////////////////
 // Restart rendering of image
@@ -44,6 +45,8 @@ namespace pathtracer {
 // map.
 ///////////////////////////////////////////////////////////////////////////
     vec3 Lenvironment(const vec3 &wi) {
+        if (!settings.environment_light) return vec3(0.f);
+
         const float theta = acos(std::max(-1.0f, std::min(1.0f, wi.y)));
         float phi = atan(wi.z, wi.x);
         if (phi < 0.0f)
@@ -103,23 +106,24 @@ namespace pathtracer {
             BSDF &mat = transparency_blend;
 
             ///////////////////////////////////////////////////////////////////
-            // Calculate Direct Illumination from light.
+            // Calculate Direct Illumination from lights.
             ///////////////////////////////////////////////////////////////////
-            Ray shadowRay;
-            shadowRay.o = hit.position + hit.geometry_normal * EPSILON;
-            shadowRay.d = normalize(point_light.position - shadowRay.o);
-            if (!occluded(shadowRay)) {
-                const float distance_to_light = length(point_light.position - hit.position);
-                const float falloff_factor = 1.0f / (distance_to_light * distance_to_light);
-                vec3 Li = point_light.intensity_multiplier * point_light.color * falloff_factor;
-                vec3 wi = normalize(point_light.position - hit.position);
-                vec3 brdf = mat.f(wi, hit.wo, hit.shading_normal);
-                L += path_throughput * brdf * Li *
-                     std::max(0.0f, dot(wi, hit.shading_normal));
-                if (any(isnan(L))) {
-                    printf("NAN after light!\n");
-                    printf("\tbrdf=%s\n", glm::to_string(brdf).data());
+            for (auto *light: lights) {
+                Ray shadowRay;
+                shadowRay.o = hit.position + hit.geometry_normal * EPSILON;
+                vec3 wi;
+                float lightPdf, scatteringPdf;
+                vec3 li = light->sample_li(shadowRay.o, &wi, &lightPdf);
+                shadowRay.d = wi;
+                if (lightPdf > 0 && any(greaterThan(abs(li), glm::vec3(EPSILON)))) {
+                    vec3 f = mat.f(shadowRay.d, hit.wo, hit.shading_normal) * abs(dot(wi, hit.shading_normal));
+                    // TODO: scatteringPdf, how to obtain? (needed only for BSDF sample later)
+                    if (any(greaterThan(f, glm::vec3(EPSILON))) && !occluded(shadowRay)) {
+                        float weight = 1.f; //lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
+                        L += f * li * weight / lightPdf;
+                    }
                 }
+                // TODO: BSDF sample?
             }
 
             // Emission
