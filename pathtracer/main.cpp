@@ -25,6 +25,8 @@ int windowWidth = 0, windowHeight = 0;
 static float currentTime = 0.0f;
 static float deltaTime = 0.0f;
 
+bool drawLightHelpers = false;
+
 // Mouse input
 ivec2 g_prevMouseCoords = { -1, -1 };
 bool g_isMouseDragging = false;
@@ -32,7 +34,7 @@ bool g_isMouseDragging = false;
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
-GLuint shaderProgram;
+GLuint shaderProgram, basicShader;
 
 ///////////////////////////////////////////////////////////////////////////////
 // GL texture to put pathtracing result into
@@ -50,6 +52,7 @@ vec3 worldUp(0.0f, 1.0f, 0.0f);
 // Models
 ///////////////////////////////////////////////////////////////////////////////
 vector<pair<labhelper::Model*, mat4>> models;
+vector<pathtracer::LightHelper*> lightHelpers;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Load shaders, environment maps, models and so on
@@ -60,6 +63,9 @@ void initialize()
 	// Load shader program
 	///////////////////////////////////////////////////////////////////////////
 	shaderProgram = labhelper::loadShaderProgram("../../pathtracer/simple.vert", "../../pathtracer/simple.frag");
+	basicShader = labhelper::loadShaderProgram(
+	        "../../pathtracer/simple_geo.vert",
+	        "../../pathtracer/simple_geo.frag");
 
 	///////////////////////////////////////////////////////////////////////////
 	// Initial path-tracer settings
@@ -78,15 +84,25 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Set up light
 	///////////////////////////////////////////////////////////////////////////
+    {
 //	pathtracer::point_light.intensity_multiplier = 2500.0f;
 //	pathtracer::point_light.color = vec3(1.f, 1.f, 1.f);
 //	pathtracer::point_light.position = vec3(10.0f, 40.0f, 10.0f);
-    pathtracer::lights.push_back(new pathtracer::CircleLight(worldUp * 17.f, -worldUp, 20.f, vec3(1.f, 0.f, 0.f)));
-    // To know where the light is
+        auto* circle = new pathtracer::CircleLight(
+                worldUp * 16.f, -worldUp, 8.f, vec3(1.f, 0.f, 0.f), 1.f
+        );
+        pathtracer::lights.push_back(circle);
+        lightHelpers.push_back(new pathtracer::CircleLightHelper(circle));
+        // To know where the light is
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/sphere.obj"),
 //            scale(translate(worldUp * 17.f),vec3(20.f, 1.f, 20.f))));
-    pathtracer::lights.push_back(new pathtracer::RectangleLight(worldUp * 30.f + vec3(-10.f, 0.f, -10.f),
-            vec3(20.f, 0.f, 0.f), vec3(0.f, 0.f, 20.f), vec3(0.f, 0.f, 1.f)));
+        auto* rectangle = new pathtracer::RectangleLight(
+                worldUp * 17.f + vec3(-4.f, 0.f, -4.f),
+                vec3(8.f, 0.f, 0.f), vec3(0.f, 0.f, 8.f),
+                vec3(0.f, 1.f, 1.f), 1.f);
+        pathtracer::lights.push_back(rectangle);
+        lightHelpers.push_back(new pathtracer::RectangleLightHelper(rectangle));
+    }
 
 	///////////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -97,11 +113,11 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
 	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(0.f, 10.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
-	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
@@ -115,6 +131,11 @@ void initialize()
 		pathtracer::addModel(m.first, m.second);
 	}
 	pathtracer::buildBVH();
+
+	// Light helpers
+	for (auto* helper: lightHelpers) {
+	    helper->init();
+	}
 
 	///////////////////////////////////////////////////////////////////////////
 	// Generate result texture
@@ -179,6 +200,21 @@ void display(void)
 	SDL_GetWindowSize(g_window, &windowWidth, &windowHeight);
 	glUseProgram(shaderProgram);
 	labhelper::drawFullScreenQuad();
+	if (drawLightHelpers) {
+        // Draw scene but only to depth buffer
+        glColorMask(false, false, false, false);
+        glUseProgram(basicShader);
+        for (auto &model: models) {
+            labhelper::setUniformSlow(basicShader, "modelViewProjectionMatrix",
+                    projMatrix * viewMatrix * model.second);
+            labhelper::render(model.first);
+        }
+        glColorMask(true, true, true, true);
+        // Now draw the light helpers with the previous depth
+        for (auto &helper: lightHelpers) {
+            helper->draw(basicShader, projMatrix, viewMatrix);
+        }
+    }
 }
 
 bool handleEvents(void)
@@ -415,13 +451,16 @@ void gui()
 	///////////////////////////////////////////////////////////////////////////
 	if(ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
 	{
+	    ImGui::Checkbox("Show light helpers", &drawLightHelpers);
 	    int i = 1;
 	    for (auto* light: pathtracer::lights) {
-		    ImGui::ColorEdit3(("Color" + to_string(i)).c_str(), &light->color.x);
+            auto i_str = to_string(i);
+		    ImGui::ColorEdit3(("Color" + i_str).c_str(), &light->color.x);
 		    auto* circle = dynamic_cast<pathtracer::CircleLight*>(light);
 		    if (circle) {
-		        ImGui::SliderFloat(("Radius " + to_string(i)).c_str(), &circle->_r, 1.f, 50.f);
+		        ImGui::SliderFloat(("Radius " + i_str).c_str(), &circle->_r, 1.f, 50.f);
 		    }
+		    ImGui::SliderFloat(("Intensity " + i_str).c_str(), &light->intensity, 0.1f, 7.f);
 	        i++;
 	    }
 //		ImGui::SliderFloat("Environment multiplier", &pathtracer::environment.multiplier, 0.0f, 10.0f);
@@ -473,6 +512,10 @@ int main(int argc, char* argv[])
 	for (auto* l: pathtracer::lights) {
 	    delete l;
 	}
+	for (auto* h: lightHelpers) {
+	    delete h;
+	}
+
 	pathtracer::lights.clear();
 	// Shut down everything. This includes the window and all other subsystems.
 	labhelper::shutDown(g_window);
