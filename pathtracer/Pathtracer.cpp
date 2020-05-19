@@ -19,7 +19,7 @@ namespace pathtracer {
     Settings settings;
     Environment environment;
     Image rendered_image;
-    std::vector<Light*> lights;
+    std::vector<Light *> lights;
 
 ///////////////////////////////////////////////////////////////////////////
 // Restart rendering of image
@@ -81,19 +81,32 @@ namespace pathtracer {
             }
             float metalness = hit.material->m_metalness;
             if (hit.material->m_metalness_texture.valid) {
-                metalness = hit.material->m_metalness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+                if (settings.use_bilinear_interp)
+                    metalness = hit.material->m_metalness_texture.bilinearf(hit.texture_coords.x, hit.texture_coords.y);
+                else
+                    metalness = hit.material->m_metalness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
             float fresnel = hit.material->m_fresnel;
             if (hit.material->m_fresnel_texture.valid) {
-                fresnel = hit.material->m_fresnel_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+                if (settings.use_bilinear_interp)
+                    fresnel = hit.material->m_fresnel_texture.bilinearf(hit.texture_coords.x, hit.texture_coords.y);
+                else
+                    fresnel = hit.material->m_fresnel_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
             float roughness = fclamp(hit.material->m_roughness, 0.001f, 1.f);
             if (hit.material->m_roughness_texture.valid) {
-                roughness = hit.material->m_roughness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+                if (settings.use_bilinear_interp)
+                    roughness = hit.material->m_roughness_texture.bilinearf(hit.texture_coords.x, hit.texture_coords.y);
+                else
+                    roughness = hit.material->m_roughness_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
             float reflectivity = hit.material->m_reflectivity;
             if (hit.material->m_reflectivity_texture.valid) {
-                roughness = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+                if (settings.use_bilinear_interp)
+                    reflectivity = hit.material->m_reflectivity_texture.bilinearf(hit.texture_coords.x,
+                            hit.texture_coords.y);
+                else
+                    reflectivity = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
             }
 
             Diffuse diffuse(color);

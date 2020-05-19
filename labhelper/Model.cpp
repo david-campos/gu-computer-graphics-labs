@@ -524,7 +524,6 @@ namespace labhelper {
                 bool has_fresnel_texture = material.m_fresnel_texture.valid;
                 bool has_shininess_texture = material.m_roughness_texture.valid;
                 bool has_emission_texture = material.m_emission_texture.valid;
-                bool has_normal_map = material.m_emission_texture.valid;
                 if (has_color_texture)
                     glBindTextures(0, 1, &material.m_color_texture.gl_id);
                 if (has_reflectivity_texture)
@@ -537,8 +536,6 @@ namespace labhelper {
                     glBindTextures(4, 1, &material.m_roughness_texture.gl_id);
                 if (has_emission_texture)
                     glBindTextures(5, 1, &material.m_emission_texture.gl_id);
-                if (has_normal_map)
-                    glBindTextures(6, 1, &material.m_normal_texture.gl_id);
 
                 GLint current_program = 0;
                 glGetIntegerv(GL_CURRENT_PROGRAM, &current_program);
@@ -552,8 +549,6 @@ namespace labhelper {
                 glUniform1i(glGetUniformLocation(current_program, "has_shininess_texture"), has_shininess_texture);
                 glUniform1i(glGetUniformLocation(current_program, "has_emission_texture"),
                         has_emission_texture ? 1 : 0);
-                glUniform1i(glGetUniformLocation(current_program, "has_normal_texture"),
-                        has_normal_map ? 1 : 0);
                 glUniform3fv(glGetUniformLocation(current_program, "material_color"), 1, &material.m_color.x);
                 glUniform3fv(glGetUniformLocation(current_program, "material_diffuse_color"), 1,
                         &material.m_color.x); //FIXME: Compatibility with old shading model of lab3.

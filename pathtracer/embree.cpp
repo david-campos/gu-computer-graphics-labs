@@ -1,4 +1,5 @@
 #include "embree.h"
+#include "sampling.h"
 #include <iostream>
 #include <map>
 
@@ -97,19 +98,25 @@ Intersection getIntersection(const Ray& r)
 	const labhelper::Mesh* mesh = map_geom_ID_to_mesh[r.geomID];
 	Intersection i;
 	i.material = &(model->m_materials[mesh->m_material_idx]);
-	vec3 n0 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 0];
-	vec3 n1 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 1];
-	vec3 n2 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 2];
-	float w = 1.0f - (r.u + r.v);
-	i.shading_normal = normalize(w * n0 + r.u * n1 + r.v * n2);
-	i.geometry_normal = -normalize(r.n);
-	i.position = r.o + r.tfar * r.d;
-	i.wo = normalize(-r.d);
-	vec2 t0 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 0];
+    float w = 1.0f - (r.u + r.v);
+    vec2 t0 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 0];
     vec2 t1 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 1];
     vec2 t2 = model->m_texture_coordinates[((mesh->m_start_index / 3) + r.primID) * 3 + 2];
     i.texture_coords = w * t0 + r.u * t1 + r.v * t2;
-	return i;
+    i.geometry_normal = -normalize(r.n);
+    i.position = r.o + r.tfar * r.d;
+    i.wo = normalize(-r.d);
+    vec3 n0 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 0];
+    vec3 n1 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 1];
+    vec3 n2 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 2];
+    i.shading_normal = normalize(w * n0 + r.u * n1 + r.v * n2);
+    if (i.material->m_normal_texture.valid) {
+        glm::vec3 bump = i.material->m_normal_texture.colorf3(i.texture_coords.x, i.texture_coords.y);
+        glm::vec3 tan = normalize(perpendicular(i.shading_normal));
+        glm::vec3 cotan = normalize(glm::cross(i.shading_normal, tan));
+        i.shading_normal = normalize(tan * bump.x + cotan * bump.y + i.shading_normal * bump.z);
+    }
+    return i;
 }
 
 ///////////////////////////////////////////////////////////////////////////
