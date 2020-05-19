@@ -21,6 +21,10 @@ struct Texture
 	glm::vec2 colorf2(float u, float v) const;
 	glm::vec3 colorf3(float u, float v) const;
 	glm::vec4 colorf4(float u, float v) const;
+	float bilinearf(float u, float v) const;
+	glm::vec4 bilinearf4(float u, float v) const;
+	uint u2x(float u) const;
+	uint v2y(float v) const;
 };
 //////////////////////////////////////////////////////////////////////////////
 // This material class implements a subset of the suggested PBR extension
@@ -46,6 +50,7 @@ struct Material
 	Texture m_metalness_texture;
 	Texture m_fresnel_texture;
 	Texture m_emission_texture;
+	Texture m_normal_texture;
 };
 
 struct Mesh

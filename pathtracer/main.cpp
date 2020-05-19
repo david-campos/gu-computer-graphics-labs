@@ -75,6 +75,7 @@ void initialize()
 	pathtracer::settings.aperture = 0.f;
 	pathtracer::settings.focal_distance = 100000.f;
     pathtracer::settings.environment_light = true;
+    pathtracer::settings.use_bilinear_interp = true;
 #ifdef _DEBUG
 	pathtracer::settings.subsampling = 16;
 #else
@@ -113,12 +114,12 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
-	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
+//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(0.f, 10.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
-//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(1.0f)));
+    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(10.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
 
@@ -357,6 +358,7 @@ void gui()
 		ImGui::SliderInt("Max Bounces", &pathtracer::settings.max_bounces, 0, 16);
 		ImGui::SliderInt("Max Paths Per Pixel", &pathtracer::settings.max_paths_per_pixel, 0, 1024);
 		ImGui::Checkbox("Environment Light", &pathtracer::settings.environment_light);
+		ImGui::Checkbox("Bilinear interpolation", &pathtracer::settings.use_bilinear_interp);
         ImGui::Separator();
 		ImGui::Text("Samples: %d", pathtracer::rendered_image.number_of_samples);
 		if(ImGui::Button("Restart Pathtracing"))

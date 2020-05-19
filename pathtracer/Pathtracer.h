@@ -28,6 +28,7 @@ extern struct Settings
 	float focal_distance;
 	float aperture;
 	bool environment_light;
+	bool use_bilinear_interp;
 } settings;
 
 ///////////////////////////////////////////////////////////////////////////////

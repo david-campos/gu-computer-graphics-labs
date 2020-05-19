@@ -74,7 +74,10 @@ namespace pathtracer {
             ///////////////////////////////////////////////////////////////////
             vec4 color = vec4(hit.material->m_color, 1.f - hit.material->m_transparency);
             if (hit.material->m_color_texture.valid) {
-                color = hit.material->m_color_texture.colorf4(hit.texture_coords.x, hit.texture_coords.y);
+                if (settings.use_bilinear_interp)
+                    color = hit.material->m_color_texture.bilinearf4(hit.texture_coords.x, hit.texture_coords.y);
+                else
+                    color = hit.material->m_color_texture.colorf4(hit.texture_coords.x, hit.texture_coords.y);
             }
             float metalness = hit.material->m_metalness;
             if (hit.material->m_metalness_texture.valid) {

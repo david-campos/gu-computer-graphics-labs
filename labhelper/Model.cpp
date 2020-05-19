@@ -54,9 +54,17 @@ namespace labhelper {
         return data[(pixel_y * width + pixel_x) * components + component];
     }
 
+    uint Texture::u2x(float u) const {
+        return int(roundf(u * width)) % width;
+    }
+
+    uint Texture::v2y(float v) const {
+        return int(roundf(v * height)) % height;
+    }
+
     glm::vec3 Texture::colorf3(float u, float v) const {
-        int x = int(floor(u * width));
-        int y = int(floor(v * height));
+        int x = this->u2x(u);
+        int y = this->v2y(v);
         return glm::vec3(
                 color(x, y, 0) / 255.f,
                 color(x, y, 1) / 255.f,
@@ -65,8 +73,8 @@ namespace labhelper {
     }
 
     glm::vec2 Texture::colorf2(float u, float v) const {
-        int x = int(floor(u * width));
-        int y = int(floor(v * height));
+        int x = this->u2x(u);
+        int y = this->v2y(v);
         return glm::vec2(
                 color(x, y, 0) / 255.f,
                 color(x, y, 1) / 255.f
@@ -74,8 +82,8 @@ namespace labhelper {
     }
 
     glm::vec4 Texture::colorf4(float u, float v) const {
-        int x = int(floor(u * width));
-        int y = int(floor(v * height));
+        int x = this->u2x(u);
+        int y = this->v2y(v);
         return glm::vec4(
                 color(x, y, 0) / 255.f,
                 color(x, y, 1) / 255.f,
@@ -85,9 +93,57 @@ namespace labhelper {
     }
 
     float Texture::colorf(float u, float v) const {
-        int x = int(floor(u * width));
-        int y = int(floor(v * height));
+        int x = this->u2x(u);
+        int y = this->v2y(v);
         return color(x, y, 0) / 255.f;
+    }
+
+    float Texture::bilinearf(float u, float v) const {
+        float x_coord = u * width;
+        float y_coord = v * height;
+        int x0 = floorf(x_coord);
+        int y0 = floorf(y_coord);
+        int x1 = ceilf(x_coord);
+        int y1 = ceilf(y_coord);
+        float x = x_coord - x0;
+        float y = y_coord - y0;
+
+        float f00 = color(x0, y0, 0) / 255.f;
+        float f01 = color(x0, y1, 0) / 255.f;
+        float f10 = color(x1, y0, 0) / 255.f;
+        float f11 = color(x1, y1, 0) / 255.f;
+
+        return f00 * (1.f - x ) * (1.f - y) +
+            f10 * x * (1.f - y) +
+            f01 * (1.f - x) * y +
+            f11 * x * y;
+    }
+
+    glm::vec4 Texture::bilinearf4(float u, float v) const {
+        float x_coord = u * width;
+        float y_coord = v * height;
+        int x0 = floorf(x_coord);
+        int y0 = floorf(y_coord);
+        int x1 = ceilf(x_coord);
+        int y1 = ceilf(y_coord);
+        float x = x_coord - x0;
+        float y = y_coord - y0;
+
+        glm::vec4 result;
+
+        for (int i = 0; i < 4; i++) {
+            float f00 = color(x0, y0, i) / 255.f;
+            float f01 = color(x0, y1, i) / 255.f;
+            float f10 = color(x1, y0, i) / 255.f;
+            float f11 = color(x1, y1, i) / 255.f;
+
+            result[i] = f00 * (1.f - x) * (1.f - y) +
+                   f10 * x * (1.f - y) +
+                   f01 * (1.f - x) * y +
+                   f11 * x * y;
+        }
+
+        return result;
     }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -107,6 +163,8 @@ namespace labhelper {
                 glDeleteTextures(1, &material.m_fresnel_texture.gl_id);
             if (material.m_emission_texture.valid)
                 glDeleteTextures(1, &material.m_emission_texture.gl_id);
+            if (material.m_normal_texture.valid)
+                glDeleteTextures(1, &material.m_normal_texture.gl_id);
         }
         glDeleteBuffers(1, &m_positions_bo);
         glDeleteBuffers(1, &m_normals_bo);
@@ -186,6 +244,9 @@ namespace labhelper {
             material.m_emission = m.emission[0];
             if (m.emissive_texname != "") {
                 material.m_emission_texture.load(directory, m.emissive_texname, 4);
+            }
+            if (m.normal_texname != "") {
+                material.m_normal_texture.load(directory, m.normal_texname, 3);
             }
             material.m_transparency = m.transmittance[0];
             model->m_materials.push_back(material);
@@ -398,6 +459,8 @@ namespace labhelper {
                 mat_file << "map_Pr " << mat.m_roughness_texture.filename << "\n";
             if (mat.m_emission_texture.valid)
                 mat_file << "map_Ke " << mat.m_emission_texture.filename << "\n";
+            if (mat.m_normal_texture.valid)
+                mat_file << "norm" << mat.m_normal_texture.filename << "\n";
         }
         mat_file.close();
 
@@ -461,6 +524,7 @@ namespace labhelper {
                 bool has_fresnel_texture = material.m_fresnel_texture.valid;
                 bool has_shininess_texture = material.m_roughness_texture.valid;
                 bool has_emission_texture = material.m_emission_texture.valid;
+                bool has_normal_map = material.m_emission_texture.valid;
                 if (has_color_texture)
                     glBindTextures(0, 1, &material.m_color_texture.gl_id);
                 if (has_reflectivity_texture)
@@ -473,6 +537,9 @@ namespace labhelper {
                     glBindTextures(4, 1, &material.m_roughness_texture.gl_id);
                 if (has_emission_texture)
                     glBindTextures(5, 1, &material.m_emission_texture.gl_id);
+                if (has_normal_map)
+                    glBindTextures(6, 1, &material.m_normal_texture.gl_id);
+
                 GLint current_program = 0;
                 glGetIntegerv(GL_CURRENT_PROGRAM, &current_program);
                 glUniform1i(glGetUniformLocation(current_program, "has_color_texture"), has_color_texture);
@@ -485,6 +552,8 @@ namespace labhelper {
                 glUniform1i(glGetUniformLocation(current_program, "has_shininess_texture"), has_shininess_texture);
                 glUniform1i(glGetUniformLocation(current_program, "has_emission_texture"),
                         has_emission_texture ? 1 : 0);
+                glUniform1i(glGetUniformLocation(current_program, "has_normal_texture"),
+                        has_normal_map ? 1 : 0);
                 glUniform3fv(glGetUniformLocation(current_program, "material_color"), 1, &material.m_color.x);
                 glUniform3fv(glGetUniformLocation(current_program, "material_diffuse_color"), 1,
                         &material.m_color.x); //FIXME: Compatibility with old shading model of lab3.
