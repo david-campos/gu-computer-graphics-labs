@@ -83,6 +83,13 @@ glm::vec3 cosineSampleHemisphere()
 	return ret;
 }
 
+glm::vec3 uniformSampleSphere() {
+    float z = 1 - 2 * randf();
+    float r = glm::sqrt(glm::max(0.f, 1.f - z * z));
+    float phi = 2.f * M_PIf32 * randf();
+    return glm::vec3(r * glm::cos(phi), r * glm::sin(phi), z);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // Generate a vector that is perpendicular to another
 ///////////////////////////////////////////////////////////////////////////

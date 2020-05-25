@@ -35,7 +35,7 @@ add_executable ( ${PROJECT_NAME}
     material.h
     material.cpp
     ${SHADERS}
-        light.h)
+        light.h geometry.h)
 
 target_link_libraries ( ${PROJECT_NAME} labhelper ${EMBREE_LIBRARIES} )
 config_build_output()

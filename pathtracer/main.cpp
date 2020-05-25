@@ -89,20 +89,29 @@ void initialize()
 //	pathtracer::point_light.intensity_multiplier = 2500.0f;
 //	pathtracer::point_light.color = vec3(1.f, 1.f, 1.f);
 //	pathtracer::point_light.position = vec3(10.0f, 40.0f, 10.0f);
-        auto* circle = new pathtracer::CircleLight(
-                worldUp * 16.f, -worldUp, 8.f, vec3(1.f, 0.f, 0.f), 1.f
-        );
-        pathtracer::lights.push_back(circle);
-        lightHelpers.push_back(new pathtracer::CircleLightHelper(circle));
-        // To know where the light is
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/sphere.obj"),
 //            scale(translate(worldUp * 17.f),vec3(20.f, 1.f, 20.f))));
-        auto* rectangle = new pathtracer::RectangleLight(
-                worldUp * 17.f + vec3(-4.f, 0.f, -4.f),
-                vec3(8.f, 0.f, 0.f), vec3(0.f, 0.f, 8.f),
-                vec3(0.f, 1.f, 1.f), 1.f);
-        pathtracer::lights.push_back(rectangle);
-        lightHelpers.push_back(new pathtracer::RectangleLightHelper(rectangle));
+
+//        auto* circle = new pathtracer::CircleLight(
+//                worldUp * 16.f, -worldUp, 8.f, vec3(1.f, 0.f, 0.f), 1.f
+//        );
+//        pathtracer::lights.push_back(circle);
+//        lightHelpers.push_back(new pathtracer::CircleLightHelper(circle));
+
+//        auto* rectangle = new pathtracer::RectangleLight(
+//                worldUp * 17.f + vec3(-4.f, 0.f, -4.f),
+//                vec3(8.f, 0.f, 0.f), vec3(0.f, 0.f, 8.f),
+//                vec3(0.f, 1.f, 1.f), 1.f);
+//        pathtracer::lights.push_back(rectangle);
+//        lightHelpers.push_back(new pathtracer::RectangleLightHelper(rectangle));
+
+        auto* sphere = new pathtracer::SphereLight(
+                worldUp * 16.f,
+                10.f,
+                vec3(0.f, 1.f, 0.f),
+                1.f);
+        pathtracer::lights.push_back(sphere);
+        lightHelpers.push_back(new pathtracer::SphereLightHelper(sphere));
     }
 
 	///////////////////////////////////////////////////////////////////////////
@@ -114,14 +123,14 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
-//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
-//	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */ translate(vec3(0.0f, 10.0f, 0.0f))));
+	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landing_pad_2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(0.f, 10.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(10.0f)));
-    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/testCUBE.obj"), mat4(1.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/testCUBE.obj"), mat4(1.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(10.0f)));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
 
@@ -464,6 +473,11 @@ void gui()
 		    if (circle) {
 		        ImGui::SliderFloat(("Radius " + i_str).c_str(), &circle->_r, 1.f, 50.f);
 		    }
+		    auto* sphere = dynamic_cast<pathtracer::SphereLight*>(light);
+		    if (sphere) {
+		        ImGui::SliderFloat3(("Center " + i_str).c_str(), &sphere->center[0], -50.f, 50.f);
+                ImGui::SliderFloat(("Radius " + i_str).c_str(), &sphere->radius, 1.f, 50.f);
+            }
 		    ImGui::SliderFloat(("Intensity " + i_str).c_str(), &light->intensity, 0.1f, 7.f);
 	        i++;
 	    }
