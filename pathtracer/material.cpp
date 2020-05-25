@@ -20,11 +20,15 @@ namespace pathtracer {
         vec3 bitangent = normalize(cross(tangent, n));
         vec3 sample = cosineSampleHemisphere();
         wi = normalize(sample.x * tangent + sample.y * bitangent + sample.z * n);
-        if (dot(wi, n) <= 0.0f)
-            p = 0.0f;
-        else
-            p = max(0.0f, dot(n, wi)) / M_PI;
+        p = pdf(wi, wo, n);
         return f(wi, wo, n);
+    }
+
+    float Diffuse::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
+        if (dot(wi, n) <= 0.0f)
+            return 0.0f;
+        else
+            return max(0.0f, dot(n, wi)) / M_PI;
     }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -81,6 +85,10 @@ namespace pathtracer {
         }
     }
 
+    float BlinnPhong::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
+        // TODO: how to do?
+    }
+
     float BlinnPhong::F(const vec3 &wi, const vec3 &wh) {
         return R0 + (1 - R0) * pow(max(0.f, 1 - abs(dot(wh, wi))), 5);
     }
@@ -133,6 +141,10 @@ namespace pathtracer {
             p *= (1 - w);
             return brdf;
         }
+    }
+
+    float LinearBlend::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
+        // TODO?
     }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -280,6 +292,10 @@ namespace pathtracer {
             return refraction_brdf(wi, wo, n);
         }
 //        return f(wi, wo, n);
+    }
+
+    float BTDF::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
+        // TODO
     }
 
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {

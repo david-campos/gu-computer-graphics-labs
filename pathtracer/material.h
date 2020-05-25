@@ -18,6 +18,9 @@ namespace pathtracer {
         // Sample a suitable direction and return the brdf in that direction as
         // well as the weight for the ray in the trace.
         virtual vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &weight) = 0;
+
+        // Probability that this direction would have been sampled by the brdf
+        virtual float pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) = 0;
     };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -33,6 +36,8 @@ namespace pathtracer {
         virtual vec3 f(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
 
         virtual vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) override;
+
+        float pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
     };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -61,6 +66,8 @@ namespace pathtracer {
         inline float G(const vec3 &wi, const vec3 &wo, const vec3 &wh, const vec3 &n);
 
         virtual vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) override;
+
+        float pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
     };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -97,6 +104,8 @@ namespace pathtracer {
         inline float G1(const vec3 &v, const vec3 &m, const vec3 &n);
         vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) override;
 
+        float pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
+
         vec3 refraction_brdf(const vec3 &i, const vec3 &o, const vec3 &n);
         virtual vec3 reflection_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n);
     };
@@ -115,6 +124,8 @@ namespace pathtracer {
         virtual vec3 f(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
 
         virtual vec3 sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) override;
+
+        float pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) override;
     };
 
 } // namespace pathtracer

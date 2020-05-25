@@ -125,6 +125,7 @@ namespace pathtracer {
             // Calculate Direct Illumination from lights.
             ///////////////////////////////////////////////////////////////////
             for (auto *light: lights) {
+                // Sample light source with multiple importance sampling
                 Ray shadowRay;
                 shadowRay.o = hit.position + hit.geometry_normal * EPSILON;
                 vec3 wi;
@@ -133,13 +134,29 @@ namespace pathtracer {
                 shadowRay.d = wi;
                 if (lightPdf > 0 && any(greaterThan(abs(li), glm::vec3(EPSILON)))) {
                     vec3 f = mat.f(shadowRay.d, hit.wo, hit.shading_normal) * abs(dot(wi, hit.shading_normal));
-                    // TODO: scatteringPdf, how to obtain? (needed only for BSDF sample later)
+                    scatteringPdf = mat.pdf(shadowRay.d, hit.wo, hit.shading_normal);
                     if (any(greaterThan(f, glm::vec3(EPSILON))) && !occluded(shadowRay)) {
-                        float weight = 1.f; //lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
+                        float weight = lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
                         L += f * li * weight / lightPdf;
                     }
                 }
-                // TODO: BSDF sample?
+                // Sample BSDF with multiple importance sampling
+                // if (!isDeltaLight) {
+                vec3 f = mat.sample_wi(wi, hit.wo, hit.shading_normal, scatteringPdf);
+                f *= abs(dot(wi, hit.shading_normal));
+                if (scatteringPdf > 0 && any(greaterThan(abs(f), glm::vec3(EPSILON)))) {
+                    float weight = scatteringPdf * scatteringPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
+                    Ray ray(hit.position, wi);
+                    bool lightIntersected = true; // TODO: find if ray intersects light
+                    li = glm::vec3(0);
+                    if (lightIntersected) {
+                        li = light->color * light->intensity; // Light emitted (?)
+                    }
+                    if (any(greaterThan(abs(li), glm::vec3(EPSILON)))) {
+                        L += f * li * weight / scatteringPdf;
+                    }
+                }
+                //}
             }
 
             // Emission
