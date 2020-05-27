@@ -11,6 +11,7 @@
 #include "labhelper.h"
 #include "sampling.h"
 #include "geometry.h"
+#include "embree.h"
 
 namespace pathtracer {
     class Light {
@@ -22,6 +23,17 @@ namespace pathtracer {
 
         virtual glm::vec3 sample_li(const glm::vec3 &ref, glm::vec3 *wi, float *pdf) const = 0;
 
+        virtual bool isDelta() const = 0;
+
+        /**
+         * Check the intersection with the light, and if the light is intersected,
+         * change the tfar of the ray accordingly. Notice this does not check
+         * any other geometry in the scene, occlusion should be tested after.
+         * @param ray the ray to intersect with the light
+         * @return true if the ray intersects the light, or false if not
+         */
+        virtual bool checkIntersection(Ray &ray) const = 0;
+
         virtual float pdf_li(const glm::vec3 &light_hit, const glm::vec3 &n,
                              const glm::vec3 &ref, const glm::vec3 &wi) const = 0;
     };
@@ -30,10 +42,21 @@ namespace pathtracer {
     private:
         glm::vec3 _position;
     public:
+        PointLight(const glm::vec3 &color, float intensity, const glm::vec3 &position) : Light(color, intensity),
+                                                                                         _position(position) {}
+
         glm::vec3 sample_li(const glm::vec3 &ref, glm::vec3 *wi, float *pdf) const override {
             *wi = normalize(_position - ref);
             *pdf = 1.f;
             return intensity * color / glm::length2(_position - ref);
+        }
+
+        bool checkIntersection(Ray &ray) const override {
+            return false;
+        }
+
+        bool isDelta() const override {
+            return true;
         }
 
         float pdf_li(const glm::vec3 &light_hit, const glm::vec3 &n, const glm::vec3 &ref,
@@ -48,6 +71,10 @@ namespace pathtracer {
 
         virtual float area() const = 0;
 
+        bool isDelta() const override {
+            return false;
+        }
+
         float pdf_li(const glm::vec3 &light_hit, const glm::vec3 &n, const glm::vec3 &ref,
                      const glm::vec3 &wi) const override {
             // We are assuming ray from wi is intersecting the surface!
@@ -59,10 +86,10 @@ namespace pathtracer {
 
     class CircleLight : public AreaLight {
     private:
-        glm::vec3 _origin;
         glm::vec3 _n;
     public:
         float _r;
+        glm::vec3 _origin;
 
         CircleLight(const glm::vec3 &origin, const glm::vec3 &n, float r, const glm::vec3 &_color, float _intensity)
                 : _origin(origin), _n(n), _r(r), AreaLight(_color, _intensity) {}
@@ -82,6 +109,17 @@ namespace pathtracer {
             return color * intensity;
         }
 
+        bool checkIntersection(Ray &ray) const override {
+            float dn = dot(ray.d, _n);
+            if (dn >= 0) return false; // Can only be intersected from the front
+            float t = dot(_n, _origin - ray.o) / dn;
+            if (t < ray.tnear || t > ray.tfar) return false; // outside ray segment
+            glm::vec3 p = ray.o + t * ray.d;
+            bool intersects = glm::length2(p) <= _r * _r;
+            if (intersects) { ray.tfar = t; }
+            return intersects;
+        }
+
         float area() const override {
             return float(M_PI * _r * _r);
         }
@@ -95,18 +133,16 @@ namespace pathtracer {
         }
     };
 
-    class RectangleLight : public AreaLight {
+    class ParallelogramLight : public AreaLight {
     private:
-        glm::vec3 _origin;
         glm::vec3 _side1, _side2; // Should be orthogonal, normal is cross(side1, side2)
         glm::vec3 _n;
     public:
-        RectangleLight(const glm::vec3 &origin, const glm::vec3 &side1, const glm::vec3 &side2, const glm::vec3 &_color,
-                       float _intensity)
+        glm::vec3 _origin;
+
+        ParallelogramLight(const glm::vec3 &origin, const glm::vec3 &side1, const glm::vec3 &side2, const glm::vec3 &_color,
+                           float _intensity)
                 : _origin(origin), _side1(side1), _side2(side2), AreaLight(_color, _intensity) {
-            if (abs(dot(_side1, _side2)) > 0.0001) {
-                printf("ERROR in RectangleLight: Sides must be orthogonal!\n");
-            }
             _n = normalize(cross(_side1, _side2));
         }
 
@@ -122,8 +158,29 @@ namespace pathtracer {
             return color * intensity;
         }
 
+        bool checkIntersection(Ray &ray) const override {
+            float dn = dot(ray.d, _n);
+            if (dn >= 0) return false; // Can only be intersected from the front
+            float t = dot(_n, _origin - ray.o) / dn;
+            if (t < ray.tnear || t > ray.tfar) return false; // outside ray segment
+            glm::vec3 p = ray.o + t * ray.d;
+            glm::vec3 C0 = p - _origin;
+            glm::vec3 C1 = p - _origin - _side1;
+            glm::vec3 C2 = p - _origin - _side1 - _side2;
+            glm::vec3 C3 = p - _origin - _side2;
+            if (dot(_n, cross(_side1, C0)) > 0
+                && dot(_n, cross(_side2, C1)) > 0
+                && dot(_n, cross(-_side1, C2)) > 0
+                && dot(_n, cross(-_side2, C3)) > 0) {
+                ray.tfar = t;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
         float area() const override {
-            return glm::length(_side1) * glm::length(_side2);
+            return length(cross(_side1, _side2));
         }
 
         const glm::vec3 &getSide1() const {
@@ -143,9 +200,14 @@ namespace pathtracer {
     public:
         glm::vec3 center;
         float radius;
+
         SphereLight(const glm::vec3 &center, float radius, const glm::vec3 &_color,
                     float _intensity)
                 : center(center), radius(radius), Light(_color, _intensity) {
+        }
+
+        bool isDelta() const override {
+            return false;
         }
 
         glm::vec3 sample_li(const glm::vec3 &ref, glm::vec3 *wi, float *pdf) const override {
@@ -189,6 +251,30 @@ namespace pathtracer {
             return color * intensity;
         }
 
+        bool checkIntersection(Ray &ray) const override {
+            glm::vec3 oc = ray.o - center;
+            float r2 = radius * radius;
+            if (glm::length2(oc) <= r2) {
+                ray.tfar = 0.f;
+                return true;
+            }
+            float a = dot(ray.d, ray.d);
+            float b = 2.f * dot(oc, ray.d);
+            float c = dot(oc, oc) - r2;
+            float discriminant = b * b - 4 * a * c;
+            if (discriminant < 0) {
+                return false;
+            } else {
+                float t = (-b - sqrtf(discriminant)) / (2.f * a);
+                if (t > 0) {
+                    ray.tfar = t;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
         float pdf_li(const glm::vec3 &light_hit, const glm::vec3 &n, const glm::vec3 &ref,
                      const glm::vec3 &wi) const override {
             if (glm::distance2(ref, center) <= radius * radius) {
@@ -218,10 +304,10 @@ namespace pathtracer {
 
     class RectangleLightHelper : public LightHelper {
     private:
-        GLuint m_vao, m_positionBuffer, m_indexBuffer;
-        RectangleLight *recLight;
+        GLuint m_vao, m_positionBuffer, m_normalBuffer;
+        ParallelogramLight *recLight;
     public:
-        RectangleLightHelper(RectangleLight *light) : LightHelper(light), recLight(light) {}
+        RectangleLightHelper(ParallelogramLight *light) : LightHelper(light), recLight(light) {}
 
         void init() override {
             glm::vec3 vertices[] = {
@@ -231,22 +317,33 @@ namespace pathtracer {
                     recLight->getSide1() + recLight->getSide2()
             };
 
+            glm::vec3 normal = cross(recLight->getSide1(), recLight->getSide2());
+            glm::vec3 normals[] = {normal, normal, normal, normal};
+
             glGenVertexArrays(1, &m_vao);
             glBindVertexArray(m_vao);
 
-            // Send them already, to erase them from memory
             glGenBuffers(1, &m_positionBuffer);
             glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 4, vertices, GL_STATIC_DRAW);
             glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, nullptr);
+
+            glGenBuffers(1, &m_normalBuffer);
+            glBindBuffer(GL_ARRAY_BUFFER, m_normalBuffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 4, normals, GL_STATIC_DRAW);
+            glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, nullptr);
+
             // Enable the attribute
             glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
         }
 
         void draw(const GLuint shader, const glm::mat4 &projectionMatrix, const glm::mat4 &viewMatrix) const override {
             glm::mat4 modelMatrix = glm::translate(recLight->getOrigin());
-            labhelper::setUniformSlow(shader, "modelViewProjectionMatrix",
-                    projectionMatrix * viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "modelViewMatrix", viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "projectionMatrix", projectionMatrix);
+            labhelper::setUniformSlow(shader, "viewMatrix", viewMatrix);
+            labhelper::setUniformSlow(shader, "normalMatrix", viewMatrix * modelMatrix);
             labhelper::setUniformSlow(shader, "lightColor", light->color);
             glBindVertexArray(m_vao);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -255,7 +352,7 @@ namespace pathtracer {
 
     class CircleLightHelper : public LightHelper {
     private:
-        GLuint m_vao, m_positionBuffer, m_indexBuffer;
+        GLuint m_vao, m_positionBuffer, m_normalBuffer;
         CircleLight *circleLight;
         int resolution;
     public:
@@ -265,12 +362,14 @@ namespace pathtracer {
             resolution = 100;
 
             glm::vec3 vertices[resolution];
+            glm::vec3 normals[resolution];
             glm::vec3 tan = glm::normalize(perpendicular(circleLight->getN()));
             glm::vec3 cotan = glm::normalize(glm::cross(circleLight->getN(), tan));
 
             for (int i = 0; i < resolution; i++) {
                 float ang = i * 2 * M_PIf32 / resolution;
                 vertices[i] = tan * cos(ang) + cotan * sin(ang);
+                normals[i] = circleLight->getN();
             }
 
             glGenVertexArrays(1, &m_vao);
@@ -281,14 +380,23 @@ namespace pathtracer {
             glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);
             glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * resolution, vertices, GL_STATIC_DRAW);
             glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, nullptr);
+
+            glGenBuffers(1, &m_normalBuffer);
+            glBindBuffer(GL_ARRAY_BUFFER, m_normalBuffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * resolution, normals, GL_STATIC_DRAW);
+            glVertexAttribPointer(1, 3, GL_FLOAT, false, 0, nullptr);
+
             // Enable the attribute
             glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
         }
 
         void draw(const GLuint shader, const glm::mat4 &projectionMatrix, const glm::mat4 &viewMatrix) const override {
             glm::mat4 modelMatrix = glm::translate(circleLight->getOrigin()) * glm::scale(glm::vec3(circleLight->_r));
-            labhelper::setUniformSlow(shader, "modelViewProjectionMatrix",
-                    projectionMatrix * viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "modelViewMatrix", viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "viewMatrix", viewMatrix);
+            labhelper::setUniformSlow(shader, "projectionMatrix", projectionMatrix);
+            labhelper::setUniformSlow(shader, "normalMatrix", viewMatrix * modelMatrix);
             labhelper::setUniformSlow(shader, "lightColor", light->color);
             glBindVertexArray(m_vao);
             glDrawArrays(GL_TRIANGLE_FAN, 0, resolution);
@@ -297,7 +405,7 @@ namespace pathtracer {
 
     class SphereLightHelper : public LightHelper {
     private:
-        labhelper::Model* model;
+        labhelper::Model *model;
         SphereLight *sphereLight;
     public:
         SphereLightHelper(SphereLight *light) : LightHelper(light), sphereLight(light) {}
@@ -308,8 +416,10 @@ namespace pathtracer {
 
         void draw(const GLuint shader, const glm::mat4 &projectionMatrix, const glm::mat4 &viewMatrix) const override {
             glm::mat4 modelMatrix = glm::scale(glm::translate(sphereLight->center), glm::vec3(sphereLight->radius));
-            labhelper::setUniformSlow(shader, "modelViewProjectionMatrix",
-                    projectionMatrix * viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "modelViewMatrix", viewMatrix * modelMatrix);
+            labhelper::setUniformSlow(shader, "viewMatrix", viewMatrix);
+            labhelper::setUniformSlow(shader, "projectionMatrix", projectionMatrix);
+            labhelper::setUniformSlow(shader, "normalMatrix", viewMatrix * modelMatrix);
             labhelper::setUniformSlow(shader, "lightColor", light->color);
             labhelper::render(model, false);
         }

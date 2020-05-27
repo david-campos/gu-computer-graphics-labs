@@ -86,7 +86,15 @@ namespace pathtracer {
     }
 
     float BlinnPhong::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
-        // TODO: how to do?
+        vec3 wh = normalize(wi + wo);
+        if (refraction_layer) {
+            return 0.5f * (
+                    D(wh, n) * abs(dot(wh, n)) / (4 * abs(dot(wo, wh)))
+                    + refraction_layer->pdf(wi, wo, n)
+            );
+        } else {
+            return D(wh, n) * abs(dot(wh, n)) / (4 * abs(dot(wo, wh)));
+        }
     }
 
     float BlinnPhong::F(const vec3 &wi, const vec3 &wh) {
@@ -144,7 +152,7 @@ namespace pathtracer {
     }
 
     float LinearBlend::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
-        // TODO?
+        return w * bsdf0->pdf(wi, wo, n) + (1 - w) * bsdf1->pdf(wi, wo, n);
     }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -295,7 +303,24 @@ namespace pathtracer {
     }
 
     float BTDF::pdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
-        // TODO
+        float eta_i = dot(wo, n) > 0 ? 1 : refraction_index;
+        float eta_o = dot(wo, n) > 0 ? refraction_index : 1;
+        bool is_refraction = (dot(wo, n) > 0) != (dot(wi, n) > 0);
+        if (is_refraction) {
+            vec3 ht = normalize(-(eta_o * wo + eta_i * wi));
+            float p_m = D(ht, n) * abs(dot(ht, n));
+            float fresnel = F(wo, ht, eta_i, eta_o);
+            float sq_den = eta_i * dot(wi, ht) + eta_o * dot(wo, ht);
+            float p = p_m * eta_o * eta_o * abs(dot(wo, ht)) / (sq_den * sq_den);
+            p *= 1.f - fresnel;
+            return p;
+        } else {
+            vec3 m = normalize(wo + wi);
+            float p_m = D(m, n) * abs(dot(m, n));
+            float fresnel = F(wo, m, eta_i, eta_o);
+            float p = p_m / (4 * abs(dot(wo, m)));
+            return p * fresnel;
+        }
     }
 
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {

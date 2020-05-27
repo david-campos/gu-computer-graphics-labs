@@ -55,6 +55,13 @@ namespace pathtracer {
         return environment.multiplier * environment.map.sample(lookup.x, lookup.y);
     }
 
+    bool checkRayLightIntersection(Ray &ray, Light &light) {
+        if (!light.checkIntersection(ray)) {
+            return false;
+        }
+        return !occluded(ray);
+    }
+
 ///////////////////////////////////////////////////////////////////////////
 // Calculate the radiance going from one point (r.hitPosition()) in one
 // direction (-r.d), through path tracing.
@@ -106,7 +113,8 @@ namespace pathtracer {
                     reflectivity = hit.material->m_reflectivity_texture.bilinearf(hit.texture_coords.x,
                             hit.texture_coords.y);
                 else
-                    reflectivity = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x, hit.texture_coords.y);
+                    reflectivity = hit.material->m_reflectivity_texture.colorf(hit.texture_coords.x,
+                            hit.texture_coords.y);
             }
 
             Diffuse diffuse(color);
@@ -136,27 +144,32 @@ namespace pathtracer {
                     vec3 f = mat.f(shadowRay.d, hit.wo, hit.shading_normal) * abs(dot(wi, hit.shading_normal));
                     scatteringPdf = mat.pdf(shadowRay.d, hit.wo, hit.shading_normal);
                     if (any(greaterThan(f, glm::vec3(EPSILON))) && !occluded(shadowRay)) {
-                        float weight = lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
-                        L += f * li * weight / lightPdf;
+                        if (light->isDelta()) {
+                            L += f * li / lightPdf;
+                        } else {
+                            float weight = lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
+                            L += f * li * weight / lightPdf;
+                        }
                     }
                 }
                 // Sample BSDF with multiple importance sampling
-                // if (!isDeltaLight) {
-                vec3 f = mat.sample_wi(wi, hit.wo, hit.shading_normal, scatteringPdf);
-                f *= abs(dot(wi, hit.shading_normal));
-                if (scatteringPdf > 0 && any(greaterThan(abs(f), glm::vec3(EPSILON)))) {
-                    float weight = scatteringPdf * scatteringPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
-                    Ray ray(hit.position, wi);
-                    bool lightIntersected = true; // TODO: find if ray intersects light
-                    li = glm::vec3(0);
-                    if (lightIntersected) {
-                        li = light->color * light->intensity; // Light emitted (?)
-                    }
-                    if (any(greaterThan(abs(li), glm::vec3(EPSILON)))) {
-                        L += f * li * weight / scatteringPdf;
+                if (!light->isDelta()) {
+                    vec3 f = mat.sample_wi(wi, hit.wo, hit.shading_normal, scatteringPdf);
+                    f *= abs(dot(wi, hit.shading_normal));
+                    if (scatteringPdf > 0 && any(greaterThan(abs(f), glm::vec3(EPSILON)))) {
+                        float weight = 1;
+                                // scatteringPdf * scatteringPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
+                        Ray ray(hit.position, wi);
+                        bool lightIntersected = checkRayLightIntersection(ray, *light);
+                        li = glm::vec3(0);
+                        if (lightIntersected) {
+                            li = light->color * light->intensity; // Light emitted (?)
+                        }
+                        if (any(greaterThan(abs(li), glm::vec3(EPSILON)))) {
+                            L += f * li * weight / scatteringPdf;
+                        }
                     }
                 }
-                //}
             }
 
             // Emission
