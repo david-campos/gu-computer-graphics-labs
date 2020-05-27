@@ -2,6 +2,7 @@
 #include "sampling.h"
 
 #include "glm/ext.hpp"
+#include "aux.h"
 
 namespace pathtracer {
 ///////////////////////////////////////////////////////////////////////////
@@ -45,13 +46,21 @@ namespace pathtracer {
 
     vec3 BlinnPhong::reflection_brdf(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         vec3 wh = normalize(wo + wi);
-        if (dot(wi, n) <= 0.f || !sameHemisphere(wi, wo, n)) return vec3(0.0f);
-        return vec3(F(wi, wh) * D(wh, n) * G(wi, wo, wh, n) / (4 * dot(n, wo) * dot(n, wi)));
+        float wi_n = dot(wi, n);
+        float wo_n = dot(wo, n);
+        if (wi_n < FLT_EPSILON || wo_n < FLT_EPSILON || !sameHemisphere(wi, wo, n)) return vec3(0.0f);
+        return vec3(F(wi, wh) * D(wh, n) * G(wi, wo, wh, n) / (4 * wo_n * wi_n));
     }
 
     vec3 BlinnPhong::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         if (dot(wi, n) <= 0.f || !sameHemisphere(wi, wo, n)) return vec3(0.0f);
-        else return reflection_brdf(wi, wo, n) + refraction_brdf(wi, wo, n);
+        else {
+            vec3 reflec = reflection_brdf(wi, wo, n);
+            vec3 refrac = refraction_brdf(wi, wo, n);
+            LOG_NAN(reflec)
+            LOG_NAN(refrac)
+            return reflec + refrac;
+        }
     }
 
     vec3 BlinnPhong::sample_wi(vec3 &wi, const vec3 &wo, const vec3 &n, float &p) {
@@ -101,23 +110,31 @@ namespace pathtracer {
         return R0 + (1 - R0) * pow(max(0.f, 1 - abs(dot(wh, wi))), 5);
     }
 
+    // Eq. 33
     float BlinnPhong::D(const vec3 &wh, const vec3 &n) {
         float wh_n = dot(wh, n);
         if (wh_n > 0) {
             float s_sqr = roughness * roughness;
-            float tan = sqrt(max(0.f, 1 - wh_n * wh_n)) / wh_n; // max to avoid numerical errors when close to 0
-            if (s_sqr + tan * tan > 0)
-                return s_sqr / (M_PI * pow(wh_n, 4.f) * pow(s_sqr + tan * tan, 2.f));
+            float tan_m = sqrt(max(0.f, 1 - wh_n * wh_n)) / wh_n; // max to avoid numerical errors when close to 0
+            float power_term = s_sqr + tan_m * tan_m;
+            if (power_term != 0) // If 0 division by 0
+                return s_sqr / (M_PI * pow(wh_n, 4.f) * power_term * power_term);
         }
         return 0.f;
     }
 
+    // Eq. 23
     float BlinnPhong::G(const vec3 &wi, const vec3 &wo, const vec3 &wh, const vec3 &n) {
-        float wo_wh = dot(wo, wh);
-        float wo_n = dot(wo, n);
-        if (wo_wh / wo_n > 0) {
-            float tan = sqrt(1 - wo_n * wo_n) / wo_n;
-            return 2.f / (1.f + sqrt(1.f + roughness * roughness * tan * tan));
+        return G1(wo, wh, n) * G1(wi, wh, n);
+    }
+
+    // Eq. 34
+    float BlinnPhong::G1(const vec3 &v, const vec3 &m, const vec3 &n) {
+        float v_m = dot(v, m);
+        float v_n = dot(v, n);
+        if (v_n != 0 && v_m / v_n > 0) {
+            float tan_v = sqrt(max(0.f, 1 - v_n * v_n)) / v_n;
+            return 2.f / (1.f + sqrt(1.f + roughness * roughness * tan_v * tan_v));
         } else return 0.f;
     }
 
@@ -271,7 +288,9 @@ namespace pathtracer {
             p = p_m / (4 * abs(dot(wo, m)));
             wi = reflect(-wo, m);
             p *= fresnel;
-            return reflection_brdf(wi, wo, n);
+            vec3 refl = reflection_brdf(wi, wo, n);
+            LOG_NAN(refl)
+            return refl;
         } else {
             // Refraction
 
@@ -297,7 +316,9 @@ namespace pathtracer {
             p = p_m * eta_o * eta_o * abs(dot(wo, ht)) / (sq_den * sq_den);
 
             p *= 1.f - fresnel;
-            return refraction_brdf(wi, wo, n);
+            vec3 refr = refraction_brdf(wi, wo, n);
+            LOG_NAN(refr)
+            return refr;
         }
 //        return f(wi, wo, n);
     }
@@ -326,6 +347,8 @@ namespace pathtracer {
     vec3 BTDF::f(const vec3 &wi, const vec3 &wo, const vec3 &n) {
         vec3 refl = reflection_brdf(wi, wo, n);
         vec3 refr = refraction_brdf(wi, wo, n);
+        LOG_NAN(refl)
+        LOG_NAN(refr)
         return refl + refr;
     }
 } // namespace pathtracer

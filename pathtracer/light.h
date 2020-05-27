@@ -80,7 +80,9 @@ namespace pathtracer {
             // We are assuming ray from wi is intersecting the surface!
             // Supposing uniform distribution over the area probability density over point is 1/area
             // Transforming it to solid angle requires dividing by cos(n, wi)/r²
-            return glm::length2(ref - light_hit) / (abs(dot(n, wi)) * area());
+            float nwi = abs(dot(n, wi));
+            if (nwi < FLT_EPSILON) nwi = FLT_EPSILON;
+            return glm::length2(ref - light_hit) / (nwi * area());
         }
     };
 

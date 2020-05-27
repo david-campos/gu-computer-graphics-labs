@@ -8,6 +8,7 @@
 #include "embree.h"
 #include "sampling.h"
 #include "light.h"
+#include "aux.h"
 
 using namespace std;
 using namespace glm;
@@ -149,6 +150,7 @@ namespace pathtracer {
                         } else {
                             float weight = lightPdf * lightPdf / (lightPdf * lightPdf + scatteringPdf * scatteringPdf);
                             L += f * li * weight / lightPdf;
+                            LOG_NAN(L)
                         }
                     }
                 }
@@ -186,11 +188,16 @@ namespace pathtracer {
 
             // return L before division by pdf so we can safely return pdf as 0 from the sample function
             // when there is some error which cuts light
-            if (pdf == 0.f || all(lessThan(abs(brdf), vec3(FLT_EPSILON))))
+            if (pdf <= 0.f || all(lessThan(abs(brdf), vec3(FLT_EPSILON))))
                 return L;
 
             float cosine_term = abs(dot(wi, hit.shading_normal));
             path_throughput *= (brdf * cosine_term) / pdf;
+            if (glm::any(glm::isnan(path_throughput))) {
+                printf("NAN:%d pt=%s brdf=%s cos=%f pdf=%f\n",
+                        __LINE__, glm::to_string(path_throughput).c_str(), glm::to_string(brdf).c_str(), cosine_term, pdf);
+                return L;
+            }
 
             if (all(lessThan(abs(path_throughput), vec3(FLT_EPSILON))))
                 return L;
@@ -199,6 +206,7 @@ namespace pathtracer {
 
             if (!intersect(current_ray)) {
                 L += path_throughput * Lenvironment(wi);
+                LOG_NAN(L)
                 return L;
             }
         }
