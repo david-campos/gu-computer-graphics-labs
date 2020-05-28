@@ -55,11 +55,11 @@ namespace labhelper {
     }
 
     uint Texture::u2x(float u) const {
-        return int(roundf(u * width)) % width;
+        return (int(roundf(u * width)) % width + width) % width;
     }
 
     uint Texture::v2y(float v) const {
-        return int(roundf(v * height)) % height;
+        return (int(roundf(v * height)) % height + height) % height;
     }
 
     glm::vec3 Texture::colorf3(float u, float v) const {
@@ -99,8 +99,8 @@ namespace labhelper {
     }
 
     float Texture::bilinearf(float u, float v) const {
-        float x_coord = u * width;
-        float y_coord = v * height;
+        float x_coord = u2x(u);
+        float y_coord = v2y(v);
         int x0 = floorf(x_coord);
         int y0 = floorf(y_coord);
         int x1 = ceilf(x_coord);
@@ -120,8 +120,8 @@ namespace labhelper {
     }
 
     glm::vec4 Texture::bilinearf4(float u, float v) const {
-        float x_coord = u * width;
-        float y_coord = v * height;
+        float x_coord = u2x(u);
+        float y_coord = v2y(v);
         int x0 = floorf(x_coord);
         int y0 = floorf(y_coord);
         int x1 = ceilf(x_coord);
@@ -129,7 +129,7 @@ namespace labhelper {
         float x = x_coord - x0;
         float y = y_coord - y0;
 
-        glm::vec4 result;
+        glm::vec4 result(0.f);
 
         for (int i = 0; i < 4; i++) {
             float f00 = color(x0, y0, i) / 255.f;

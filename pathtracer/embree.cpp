@@ -110,12 +110,12 @@ Intersection getIntersection(const Ray& r)
     vec3 n1 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 1];
     vec3 n2 = model->m_normals[((mesh->m_start_index / 3) + r.primID) * 3 + 2];
     i.shading_normal = normalize(w * n0 + r.u * n1 + r.v * n2);
-    if (i.material->m_normal_texture.valid) {
-        glm::vec3 bump = i.material->m_normal_texture.colorf3(i.texture_coords.x, i.texture_coords.y);
-        glm::vec3 tan = normalize(perpendicular(i.shading_normal));
-        glm::vec3 cotan = normalize(glm::cross(i.shading_normal, tan));
-        i.shading_normal = normalize(tan * bump.x + cotan * bump.y + i.shading_normal * bump.z);
-    }
+//    if (i.material->m_normal_texture.valid) {
+//        glm::vec3 bump = i.material->m_normal_texture.colorf3(i.texture_coords.x, i.texture_coords.y);
+//        glm::vec3 tan = normalize(perpendicular(i.shading_normal));
+//        glm::vec3 cotan = normalize(glm::cross(i.shading_normal, tan));
+//        i.shading_normal = normalize(tan * bump.x + cotan * bump.y + i.shading_normal * bump.z);
+//    }
     return i;
 }
 
