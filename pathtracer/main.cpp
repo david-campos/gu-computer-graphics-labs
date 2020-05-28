@@ -123,16 +123,16 @@ void initialize() {
     ///////////////////////////////////////////////////////////////////////////
     // Load .obj models to scene
     ///////////////////////////////////////////////////////////////////////////
-//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */
-//            translate(vec3(0.0f, 10.0f, 0.0f))));
-//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
+    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/NewShip.obj"), /*scale(vec3(10.f)) */
+            translate(vec3(0.0f, 10.0f, 0.0f))));
+    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landingpad2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/landing_pad_2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/tetra_balls.obj"), translate(vec3(0.f, 10.f, 0.f))));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), mat4(1.0f)));
 //	models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/BigSphere2.obj"), translate(vec3(0.0f, 10.0f, 0.0f))));
-//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), mat4(10.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/untitled.obj"), scale(vec3(10.f))));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/testCUBE.obj"), mat4(1.0f)));
-    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), mat4(10.0f)));
+//    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/wheatley.obj"), scale(vec3(10.f))));
 //    models.push_back(make_pair(labhelper::loadModelFromOBJ("../../scenes/roughness_test_balls.obj"), mat4(1.0f)));
 
 
@@ -219,7 +219,7 @@ void display(void) {
             labhelper::setUniformSlow(basicShader, "modelViewMatrix", viewMatrix * modelMatrix);
             labhelper::setUniformSlow(basicShader, "projectionMatrix", projMatrix);
             labhelper::setUniformSlow(basicShader, "viewMatrix", viewMatrix);
-            labhelper::render(model.first);
+            labhelper::render(model.first, false);
         }
         glColorMask(true, true, true, true);
         // Now draw the light helpers with the previous depth
